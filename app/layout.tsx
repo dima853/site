@@ -1,6 +1,7 @@
 import 'css/tailwind.css'
 import 'pliny/search/algolia.css'
 import 'remark-github-blockquote-alert/alert.css'
+// eslint-disable-next-line prettier/prettier
 import { Analytics } from "@vercel/analytics/next"
 
 import { Space_Grotesk } from 'next/font/google'
