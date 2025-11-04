@@ -18,7 +18,6 @@ import {
 import rehypeSlug from 'rehype-slug'
 import rehypeAutolinkHeadings from 'rehype-autolink-headings'
 import rehypeKatex from 'rehype-katex'
-import rehypeKatexNoTranslate from 'rehype-katex-notranslate'
 import rehypeCitation from 'rehype-citation'
 import rehypePrismPlus from 'rehype-prism-plus'
 import rehypePresetMinify from 'rehype-preset-minify'
@@ -55,6 +54,13 @@ const computedFields: ComputedFields = {
   filePath: {
     type: 'string',
     resolve: (doc) => doc._raw.sourceFilePath,
+  },
+  language: {
+    type: 'string',
+    resolve: (doc) => {
+      const pathParts = doc._raw.flattenedPath.split('/')
+      return pathParts[1] // 'en' или 'ru'
+    },
   },
   toc: { type: 'json', resolve: (doc) => extractTocHeadings(doc.body.raw) },
 }
@@ -95,6 +101,7 @@ function createSearchIndex(allBlogs) {
 
 export const Blog = defineDocumentType(() => ({
   name: 'Blog',
+  // ИЗМЕНИЛ: теперь ищем файлы во всех языковых папках
   filePathPattern: 'blog/**/*.mdx',
   contentType: 'mdx',
   fields: {
@@ -173,7 +180,6 @@ export default makeSource({
         },
       ],
       rehypeKatex,
-      rehypeKatexNoTranslate,
       [rehypeCitation, { path: path.join(root, 'data') }],
       [rehypePrismPlus, { defaultLanguage: 'js', ignoreMissing: true }],
       rehypePresetMinify,
