@@ -248,7 +248,9 @@ A child's black-height is *at least* `bh(x) - 1` (this is the worst case for our
 $$ 2^{bh(x) - 1} - 1 \text{ internal nodes} $$
 
 Now, the total number of internal nodes in the subtree rooted at `x` is:
-\[ \text{(Nodes in left subtree)} + \text{(Nodes in right subtree)} + \text{(Node x itself)} \]
+Now, the total number of internal nodes in the subtree rooted at `x` is:
+\[ \text{{(Nodes in left subtree)}} + \text{{(Nodes in right subtree)}} + \text{{(Node x itself)}}
+\]
 \[ \geq \left[2^{bh(x)-1} - 1\right] + \left[2^{bh(x)-1} - 1\right] + 1 \]
 \[ = 2 \cdot \left(2^{bh(x)-1} - 1\right) + 1 \]
 \[ = 2^{bh(x)} - 2 + 1 \]
