@@ -1,0 +1,264 @@
+---
+title: 'Free Block Search Algorithms in Memory Managers'
+date: '2025-11-16'
+
+summary: ''
+draft: false # если true - пост не будет опубликован
+authors: ['default'] # автор из data/authors/
+layout: PostLayout # макет поста
+images: ['/static/images/my-image.jpg'] # опционально: изображения
+---
+
+## FUNDAMENTAL PROBLEM STATEMENT
+
+**Definition**: The task of allocating a memory block of size `n` from a pool of free blocks reduces to finding a block `B` in the set of free blocks `F` such that:
+
+1. `size(B) ≥ n` (sufficiency)
+2. `B` minimizes some cost function `C(B, n)` (optimality)
+
+**The set of free blocks** is represented as:
+
+```
+F = {B_i = (addr_i, size_i) | B_i is free, 0 ≤ i < m}
+```
+
+where `addr_i` is the starting address, `size_i` is the block size.
+
+### **But, first let's understand what stack and heap are.**
+
+### 1. Conceptual Division: Manager vs. Location
+
+**Memory is physically stored in RAM** and the processor accesses it by addresses. The terms **"stack"** and **"heap"** are not physical areas on chips, but **logical models for organizing memory access** within the process's virtual address space.
+
+- **Stack** — is a **LIFO (Last In, First Out)** model, closely tied to the execution flow (`thread`). Its main task is to store function call context: arguments, local variables, return addresses. Its structure is predictable and managed by **the compiler and hardware** (stack pointer register — `SP/ESP/RSP`).
+- **Heap** — is a **random access** model. Its task is to provide memory blocks whose lifetime is not tied to the nesting of function calls. It is managed by **the programmer** (via `malloc/free`, `new/delete`) or the **runtime environment** (garbage collector).
+
+### 2. Why does the allocator (memory manager) operate with the concept of "heap"?
+
+Because **"heap" is a pool of unstructured, free-for-allocation memory within the process's address space.** The allocator is the **manager of this pool**.
+
+The algorithms we will analyze later (First-Fit, Buddy System) are precisely strategies for managing this pool: finding a free chunk, splitting it, merging freed chunks (coalescence), fighting fragmentation.
+
+**The stack is managed according to fundamentally different rules that do not require such a "manager":**
+
+- **Allocation:** When entering a function, the compiler calculates the total size of all local variables and simply **moves the stack pointer (SP) down by the required number of bytes**. This is one assembly instruction (`SUB`). No free block search.
+- **Deallocation:** When exiting the function, the stack pointer **is moved back up** (`ADD` or simply loading the saved value from the frame). No merging, no list of free blocks is maintained.
+- **"Fragmentation" of the stack** — is simply a "hole" between the SP and the end of the stack, which instantly disappears as soon as the SP moves up when returning from functions. This is not fragmentation in the classical sense, but simply an **unused** area at the moment.
+
+**The stack does not have the problem of finding a free block. It has only one "free" area — the one above the current SP.**
+
+### 3. Important Clarification: "Owns" — in what sense?
+
+Here is a key nuance. When we say "the allocator owns the heap," it does not mean that the OS or the process has "given" it to it.
+
+1.  **OS Level:** When a process starts, the OS allocates a virtual address space for it. Part of this space is reserved for the stack(s) of each thread. Another large contiguous area (often growing) is allocated for the **"process heap"** (for example, the area from which `sbrk` or `mmap` can allocate memory).
+2.  **Runtime Level (allocator):** The standard library of the language (e.g., glibc's `malloc`) **"digs under" the OS**. On the first call to `malloc()`, it requests a large block of memory from the OS (e.g., 128KB via `sbrk` or `mmap`). This block becomes its **primary pool, its "heap" in the context of the manager**.
+3.  **Program Level:** When you call `malloc(100)`, you are not accessing the OS, but this manager. It looks for free 100 bytes within its pool using those very algorithms (First-Fit, Segregated Lists). If there is no space in its pool, it goes to the OS for **another large block** to expand its pool.
+
+**Thus, the "heap" at the allocator level is its internal memory pool, which it organizes itself.** The OS simply provides it with raw pages of virtual memory upon request.
+
+---
+
+## 2. CLASSIFICATION OF SEARCH STRATEGIES
+
+### 2.1 First-Fit (First Suitable)
+
+**Essence:** Free blocks are organized in a list (most often doubly linked). Metadata (pointers `next/prev`) is stored in the body of the free block. During the search, the allocator traverses the list from the head until the first block whose size `size >= N`. This block is removed from the free list. If `size` is significantly larger than `N`, **splitting** is performed: an allocated block of size `N` is created, and the remainder (a new free block) is inserted back into the list.
+
+<img src="https://media.geeksforgeeks.org/wp-content/uploads/20250430165625886123/6_096mdsbhfjdsnj.webp" />
+
+---
+
+### **Pseudocode**
+
+```
+function FIRST_FIT(F, n):
+    for each B in F in address order:
+        if size(B) ≥ n:
+            return B
+    return NULL
+```
+
+### **But, let's recall what a process and a thread are**
+
+**Process and thread are different abstractions of the OS kernel for code execution.**
+
+### **Process**
+
+Technically — it is a **resource container**. Each process has:
+
+1.  **Its own virtual address space** (isolated page table).
+2.  **A table of open files and descriptors** (files, sockets, pipes).
+3.  **Credentials and access rights** (UID, GID, capabilities).
+4.  **Signals and their handlers**.
+5.  **At least one execution thread**.
+
+**The key point:** Processes are isolated. The memory of one process is _by default_ invisible to another (for exchange, IPC mechanisms are needed).
+
+#### **Moreover, if there were no hardware virtual memory, process isolation in its modern understanding would be impossible. That is, process isolation is fundamentally and hardware-guaranteed by virtual memory.**
+
+### **What is virtual memory?**
+
+**Imagine** that physical memory (RAM) is a huge warehouse with millions of identical cells (bytes).
+
+**Without virtual memory**, all programs receive a single map of this warehouse with real cell numbers. If one program says "put a value in cell **№12345**", it will put it in the real cell **№12345**. Another program, reading "cell **№12345**", will get this value. **No isolation.**
+
+### **Virtual memory** is a fundamental abstraction that makes each process _think_ that it alone owns all the computer's physical memory, although in reality the memory is shared among many processes and the OS.
+
+1.  **Address abstraction:**
+    - The process works with **virtual addresses** (for example, from `0x00000000` to `0xFFFFFFFF` in a 32-bit system).
+    - The hardware (CPU + MMU — Memory Management Unit) translates these virtual addresses into **physical addresses** of real RAM modules.
+    - Each process has its own **complete and independent** virtual address area. The virtual address `0x1000` in Process A points to a different physical cell than the same address `0x1000` in Process B.
+
+2.  **Page Table:**
+    - Address translation occurs through hierarchical tables (Page Tables), unique for each process.
+    - An entry in the table (Page Table Entry, PTE) contains the physical address of the page and control bits (present in RAM, readable/writable, etc.).
+
+3.  **Paging:**
+    _ Memory is divided into fixed blocks — **pages** (usually 4 KiB). - KiB is a "kibibyte". 1 KiB = 1024 bytes.
+    **This is an important clarification because in the context of memory and OS, powers of two are always used, not powers of ten.** - Virtual address space is a linear sequence of virtual pages. Physical memory is a set of physical page frames.
+    _ The page table specifies the mapping: **Virtual Page N → Physical Frame M**.
+
+4.  **Swapping/Paging Mechanism:**
+    - If physical memory is insufficient, the OS kernel can **swap out** rarely used pages to disk (to a special area of a partition or a swap file).
+    - The PTE of such a page is marked "not present in memory". An attempt to access it causes an exception — **page fault**.
+    - The page fault handler in the kernel finds the required page on disk, loads it into a free physical frame (possibly swapping out another page), updates the PTE, and resumes the process execution.
+
+### **Thread**
+
+Technically — it is a **unit of scheduling on the CPU (CPU scheduling entity)**. Each thread has:
+
+1.  **Its own register context** (CPU register values, including stack pointer SP and instruction pointer IP).
+2.  **Its own call stack** (but within the process's address space).
+3.  **Priority and scheduler state** (running, waiting, ready).
+
+**The key point:** Threads of the same process **share the entire address space and resources** from the list above. They share the heap, files, global variables.
+
+### **Analogy**
+
+Imagine a computer with virtualization:
+
+- **Process** is a **virtual machine (VM)**. It has its own virtual memory, its own virtual disks, its own network interfaces.
+- **Thread** is a **virtual CPU core (vCPU)** inside this VM. Several vCPUs work inside one VM, sharing all its resources.
+
+---
+
+### 2.2 Best-Fit (Best Suitable)
+
+```
+function BEST_FIT(F, n):
+    best = NULL
+    min_waste = ∞
+    for each B in F:
+        if size(B) ≥ n:
+            waste = size(B) - n
+            if waste < min_waste:
+                min_waste = waste
+                best = B
+    return best
+```
+
+**Worst-case theorem**: Best-Fit minimizes external fragmentation in a static scenario, but:
+
+- Search complexity: O(m)
+- Creates the maximum number of residual blocks of minimal size
+
+### 2.3 Worst-Fit (Worst Suitable)
+
+```
+function WORST_FIT(F, n):
+    worst = NULL
+    max_size = 0
+    for each B in F:
+        if size(B) ≥ n and size(B) > max_size:
+            max_size = size(B)
+            worst = B
+    return worst
+```
+
+**Invariant**: Aims to leave large free blocks, which theoretically reduces the probability of allocation failure for large requests
+
+## Chunks/Arenas
+
+### **1. Chunk — atomic unit of management**
+
+**A chunk is not just a "piece of memory". It is a container with metadata, a unit of allocation and deallocation.**
+
+#### **Chunk structure (using dlmalloc/ptmalloc as an example):**
+
+```
++----------------+ <-- Pointer returned to user (mem)
+| size (with     |
+| flags)         |   <-- Header (metadata). Hidden from user.
++----------------+ <-- Pointer managed by allocator (chunk)
+| User data      |
+| (user memory)  |
+| ...            |
++----------------+
+| size (with     |
+| flags)         |   <-- Footer (only for free chunks)
++----------------+
+```
+
+**Footer** in the context of a memory manager is an additional metadata block placed at the end of a chunk (memory block).
+
+**Key features:**
+
+- **Size** is stored in the header **together with flags** (for example, bit `P` — previous chunk is free, bit `M` — allocated via `mmap`, bit `A` — belongs to non-main arena).
+- **Alignment:** The chunk address is aligned (usually to 8/16 bytes). The user pointer (`mem`) is offset relative to it.
+- **Boundary tags:** Size is stored at **the beginning and end** of the chunk. Why at the end? So that during deallocation, having a pointer to the previous chunk, its size can be determined and checked if it's free — for **coalescence**.
+- **In a free chunk**, the "user data" field is used to store `fd` (forward) and `bk` (backward) pointers in a doubly linked list of free chunks of the corresponding size (bin).
+
+---
+
+### **2. Arena — memory domain for parallelism**
+
+**An arena is an isolated memory pool (a set of chunks) managed by its own set of data structures (binned heaps, lists).**
+
+#### **The problem that arenas solve:**
+
+In traditional `malloc` with a single global heap **all threads synchronize on one lock**. Thread 1 allocates memory → acquires the global mutex → threads 2, 3, ... wait → contention, performance degradation.
+
+**Solution:** Split the heap into independent **arenas**. Threads working with different arenas do not interfere with each other.
+
+#### **Arena architecture (as in glibc's ptmalloc):**
+
+```
++---------------------+      +---------------------+
+|   Main Arena        |      |   Arena 1           |
+|  (Main Arena)       |      |  (Non-Main Arena)   |
+|                     |      |                     |
+|  +--------------+   |      |  +--------------+   |
+|  | Heap         |   |      |  | Heap         |   |
+|  | (sbrk/mmap)  |   |      |  |   (only      |   |
+|  +--------------+   |      |  |    mmap)     |   |
+|  | Binlists     |   |      |  +--------------+   |
+|  | (bins)       |   |      |  | Binlists     |   |
+|  +--------------+   |      |  | (bins)       |   |
+|  | Mutex        |   |      |  +--------------+   |
+|  | (lock)       |   |      |  | Mutex        |   |
+|  +--------------+   |      |  | (lock)       |   |
++---------------------+      +---------------------+
+         ^                              ^
+         | (thread 1)                   | (thread 2)
+```
+
+- **Main Arena:** The only one that uses `sbrk()` to expand the heap. Always exists.
+- **Non-Main Arenas:** Created as needed. Each is an **independent memory region obtained via `mmap()`** (usually 1MB or more).
+- **Each arena has:**
+  - Its own **heap** (one or several `mmap` regions).
+  - Its own **binlists** (arrays of free chunk lists sorted by size: fast bins, small bins, large bins, unsorted bin).
+  - Its own **mutex**.
+
+#### **Strategy for distributing threads across arenas:**
+
+1.  On the first memory allocation in a thread, `malloc()` tries to find a free (unlocked) arena and bind the thread to it.
+2.  If there are no free arenas — a new one is created.
+3.  Subsequently, the thread **when possible** uses "its" arena, minimizing contention.
+4.  But if there is no free memory of the required size in "its" arena, the thread can **steal** memory from another arena (through global synchronization).
+
+**This is a trade-off:** Complete isolation is impossible, as it would lead to inefficient memory use (one arena is full, another is empty). Therefore, there is periodic **rebalancing**.
+
+---
+
+**there may be errors in the text\***
