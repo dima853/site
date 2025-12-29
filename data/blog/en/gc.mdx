@@ -1,0 +1,1425 @@
+---
+title: 'JVM, Memory Management и Performance'
+date: '2025-11-29'
+
+summary: ''
+draft: false # если true - пост не будет опубликован
+authors: ['default'] # автор из data/authors/
+layout: PostLayout # макет поста
+images: ['/static/images/my-image.jpg'] # опционально: изображения
+---
+
+### **JVM, Memory Management, and Performance**
+
+1.  **Explain the complete lifecycle of an object in the heap (Heap).** From creation to garbage collection, including generations (Young Gen, Old Gen), Eden, S0, S1.
+2.  **What is Garbage Collection (GC)?** Explain the main algorithms (Mark-Sweep, Mark-Compact, Copying) and their trade-offs.
+3.  **Describe the differences between Serial, Parallel, CMS, G1, and ZGC garbage collectors.** In which scenarios is each preferable?
+4.  **What are Stop-The-World (STW) pauses?** How do different GCs affect their duration and frequency?
+5.  **Explain what a "memory leak" is in Java.** Provide concrete examples from practice (e.g., in static collections, caches, unclosed resources).
+6.  **What is Metaspace (Java 8+) and how does it differ from PermGen?** What causes OutOfMemoryError: Metaspace?
+7.  **Explain the String Pool (String Table).** How does the `intern()` method work and when is its use justified?
+8.  **What is Escape Analysis and how does it help with optimization?** (Connection to Stack Allocation and Scalar Replacement).
+9.  **Describe the memory structure of a Java thread (Stack Memory).** What is stored in a method frame (local variables, operand stack, reference to runtime constant pool)?
+10. **What is JIT compilation (C1, C2/C1 and C2 (Tiered Compilation))?** What is code "profiling" and deoptimization?
+11. **Explain the principle of operation of a `volatile` variable.** What is "happens-before" and how does it ensure visibility of changes between threads?
+12. **What is false sharing and how to avoid it?** (For example, using `@Contended`).
+
+---
+
+# Answers to Questions:
+
+\***_this article contains simplifications_**
+
+### **1. Lifecycle of an object in the heap: from allocation to reincarnation**
+
+**Creation (Allocation):**
+
+1.  **The vast majority** of objects are allocated in **Eden Space** (Young Generation). Allocation happens via the **Pointer Bump** mechanism (`TLAB` — Thread-Local Allocation Buffer), which reduces the operation to pointer increment — O(1), requiring almost no synchronization.
+2.  **Large objects** (threshold depends on JVM, often > 512KB-1MB) go directly into **Old Generation** (Humongous Region in G1), bypassing Young Gen, to avoid expensive copying.
+
+**Early life in Young Generation (Short-lived objects):**
+
+- **Eden**: When Eden fills up, a **Minor GC** is initiated.
+  **Minor GC** is a fast, partial cleanup of RAM in Java that only affects the area called **Young Generation**.
+
+- **Copying Algorithm**: Live objects (reachable from GC Roots) are copied from Eden and _one_ of the Survivor Spaces (S0 or S1) to the **second** Survivor Space.
+- **Survivor Spaces (S0/S1, or From/To)**: Two identically sized spaces, **always one is empty**.
+  (**If both Survivors contained data:**
+  **There would be nowhere to copy new live objects from Eden**)
+  After each Minor GC, live objects are copied between them, and their age (`age`) is incremented. This space **filters out** short-lived objects with minimal overhead.
+- **Promotion**: Upon reaching the age threshold (`MaxTenuringThreshold`, usually 15), an object is considered long-lived and is moved (promoted) to **Old Generation**. **_(simplification)_**
+
+**Maturity in Old Generation (Long-lived objects):**
+
+- Objects survive for a long time.
+- Filling up Old Gen (or reaching a certain threshold, `InitiatingHeapOccupancyPercent`) triggers a **Major GC** (or Full GC, depending on the collector), which works with the entire heap.
+- **Algorithms in Old Gen** are more complex: Mark-Sweep-Compact (Serial, Parallel), Concurrent Mark-Sweep (CMS), or mixed ones, as in G1/ZGC/Shenandoah.
+
+**Death and recycling (Garbage Collection):**
+
+- An object becomes garbage when **there is not a single reference** from a live object (GC Root) via **any reachability path**.
+- **GC Roots**: Static variables, active Stack Frames, JNI References, loaded system classes.
+- Memory is freed by the collector. In Eden/Survivor — by copying live objects (dead ones are ignored). In Old Gen — by "sweeping" and subsequent "compaction" to combat fragmentation.
+
+---
+
+### **2. Garbage Collection: Basic algorithms and trade-offs**
+
+- **Garbage Collection** is an automated dynamic memory management system that frees objects unreachable by the executing program.
+
+**Algorithms:**
+
+1.  **Mark-Sweep:**
+    - **Phase 1 (Mark)**: Traversing the reachability graph from GC Roots. Live objects are marked.
+    - **Phase 2 (Sweep)**: Linear pass through the entire memory. Unmarked (dead) blocks are marked as free.
+    - **Trade-offs**: **Causes fragmentation.** Low overhead, but leads to a **"holey"** heap, degrading allocation performance and potentially causing OOM due to lack of contiguous space.
+
+2.  **Copying:**
+    - Divides memory into two semi-spaces (`From` and `To`).
+    - Live objects are copied from `From` to `To`. After copying, the entire `From` space is considered free.
+    - **Trade-offs**: **Requires 2x more memory** (half is always empty). **Does not fragment memory.** Extremely efficient if most objects die young. Used **only in Young Generation**.
+
+3.  **Mark-Compact:**
+    - **Phase 1 (Mark)**: Same as Mark-Sweep.
+    - **Phase 2 (Compact)**: Live objects are moved to the beginning of the region, forming a contiguous block of memory. All references to moved objects are updated.
+    - **Trade-offs**: **Eliminates fragmentation.** The most expensive operation due to the cost of moving and updating references. Used primarily in **Old Generation**.
+
+**Evolutionary conclusion:** Young Gen uses **Copying** (high mortality, efficiency). Old Gen uses hybrids of **Mark-Sweep/Compact** (low mortality, combating fragmentation). Modern GCs (G1, ZGC) divide the heap into regions, applying algorithms precisely.
+
+---
+
+### **3. Garbage Collectors: Strategic Choice**
+
+- **Serial GC (`-XX:+UseSerialGC`)**: Single-threaded, for **Mark, Sweep, Compact**. STW only. **Scenario:** Single-threaded applications, microcontrollers, environments with minimal resources.
+- **Parallel GC (Throughput Collector) (`-XX:+UseParallelGC`)**: Multi-threaded versions of Serial for Young and Old Gen. **Maximizes throughput** at the cost of more aggressive CPU usage and **longer STW pauses**. **Scenario:** Batch processing, computations, where pauses of hundreds of milliseconds to seconds are acceptable.
+- **CMS – Concurrent Mark Sweep (`-XX:+UseConcMarkSweepGC`)**: **Reduces STW pause duration** by having the collector work concurrently with the application.
+  - **Phases:** `Initial Mark` (STW, fast), `Concurrent Mark`, `Concurrent Preclean`, `Remark` (STW), `Concurrent Sweep`.
+  - **Trade-offs:** Does not perform compaction by default → **fragmentation**, possible `Concurrent Mode Failure` (forced Full GC). High CPU consumption in background.
+- **G1 – Garbage First (`-XX:+UseG1GC`, default from Java 9-11)**: Regional (`-XX:G1HeapRegionSize`), predictive.
+  - Divides the heap into ~2000 regions. Collects regions with the most garbage first (`Garbage First`). Has **soft real-time goals** (`-XX:MaxGCPauseMillis`).
+  - **Scenario:** Universal balance between throughput and latency. The main choice for most applications with heap >4-6GB.
+- **ZGC (`-XX:+UseZGC`) and Shenandoah (`-XX:+UseShenandoahGC`)**: **Low-latency** (`sub-millisecond` goals) collectors.
+  - **Key feature:** Almost all phases, including object relocation, are performed **concurrently** with the application.
+  - Use colored pointers and read/write barriers (`load barriers`).
+  - **Scenario:** Latency-critical applications: financial transactions, high-load web services, large heaps (terabytes).
+
+**Selection strategy:** The **lower the acceptable latency**, the more advanced and concurrent a collector is required. **Throughput -> Latency** gradient: Parallel -> G1 -> ZGC/Shenandoah.
+
+---
+
+### **4. Stop-The-World (STW): Anatomy of a Freeze**
+
+- **STW** — a phase when all application threads are suspended to perform a GC operation safe against a changing object graph.
+- **Causes:** Root scanning (`Root Scanning`), the `Remark` phase in CMS/G1 (accounting for changes during concurrent marking), evacuation and compaction in non-concurrent phases.
+- **GC Impact:**
+  - **Serial/Parallel:** Dominant, long STW phases. Pauses grow with heap size.
+  - **CMS:** Significantly reduces STW (`Initial Mark`, `Remark`), but leaves the risk of `Concurrent Mode Failure` (long STW).
+  - **G1:** Predictable, manageable pauses (`MaxGCPauseMillis`). STW is limited to evacuating a selected set of regions.
+  - **ZGC/Shenandoah:** STW is reduced to microsecond root scanning (`Root Scanning`). Most of the work is concurrent.
+
+---
+
+### **5. Memory Leak in Java: Systematic Failure**
+
+- **Memory leak** — a situation where objects are no longer used by the application but cannot be collected by GC due to remaining **incorrect references** stored in live data structures.
+- **This is not a JVM bug, but a logical error in the code.**
+
+**Canonical examples:**
+
+1.  **Static collections (Classic):**
+    ```java
+    public class LeakyClass {
+        private static final List<byte[]> STATIC_CACHE = new ArrayList<>();
+        public void processData(byte[] data) {
+            STATIC_CACHE.add(data); // The data object is forever reachable via the static field
+        }
+    }
+    ```
+2.  **Uncontrolled caches (Guava Cache, Caffeine without eviction policy):**
+    ```java
+    Cache<Key, Value> cache = Caffeine.newBuilder().build(); // No expireAfterWrite or maximumSize
+    // Cache grows indefinitely.
+    ```
+3.  **Unclosed resources (`InputStream`, `Connection`, `Session`):**
+    Resources often hold references to internal buffers or objects in native memory. **Solution:** `try-with-resources`.
+4.  **Event listeners (Listeners) and inner classes:**
+    Not unsubscribing from a listener stored in a global context keeps a reference to the outer class.
+5.  **`ThreadLocal` without cleanup (especially in thread pools):**
+    The value in `ThreadLocal` lives as long as the thread lives. In web applications, a thread returns to the pool and lives for years.
+    ```java
+    private static final ThreadLocal<HeavyContext> threadLocal = new ThreadLocal<>();
+    // After use, it is necessary to: threadLocal.remove();
+    ```
+
+**Diagnosis:** Monitoring Old Gen (constant growth), analyzing heap dump (`jmap -dump`, `MAT`, `VisualVM`), searching for `java.lang.Object[]` with the largest retained size.
+
+---
+
+### **6. Metaspace vs PermGen: Evolution of Metadata**
+
+**PermGen (up to Java 7)** — a fixed heap segment for class metadata, causing frequent `OutOfMemoryError` and requiring manual size tuning.
+
+**Metaspace (since Java 8)** — a dynamic area in native memory, automatically managed by the OS, eliminating PermGen problems and allowing efficient loading and unloading of classes.
+
+- **PermGen (≤ Java 7)**: Fixed size (`-XX:MaxPermSize`). Stored class metadata, interned strings, static members. Frequent cause of `OutOfMemoryError: PermGen space`.
+- **Metaspace (Java 8+)**: **Native memory** (not part of Java Heap).
+  - **Managed by the OS**, unlimited by default (limited by physical memory/swap).
+  - **Automatic growth and cleanup.** Class-loaders and their loaded classes are collected by GC.
+  - **Divided:** `Klass Metaspace` (non-droppable metadata), `NoKlass Metaspace` for other things.
+- **`OutOfMemoryError: Metaspace` occurs when:**
+  1.  The limit is reached (`-XX:MaxMetaspaceSize`).
+  2.  **Metadata leak (ClassLoader Leak)**: A common cause — containers (Tomcat, OSGi) where applications are reloaded, but the old ClassLoader is held (e.g., via a thread or static reference), preventing its classes from being unloaded.
+
+---
+
+### **7. String Pool (String Table): Deduplication Mechanism**
+
+- **String Pool** — a hash table (`Hashtable`) in the heap (previously in PermGen), storing **canonical** (`interned`) instances of `String`.
+- **Rules:**
+  1.  String literals (`"text"`) are added to the Pool **during class loading**.
+  2.  `String.intern()`: Allows **adding** a string created at runtime to the Pool. Returns the canonical representation.
+      - If the string is already in the Pool — returns a reference to it.
+      - If not — adds the current object to the Pool and returns it.
+- **When to use `intern()`:**
+  - **Almost never** in typical application code.
+  - **Justified:** When processing huge volumes of data with **a high degree of string duplication** (parsing CSV, tags, enum-like values), when it is required:
+    - Significant memory savings (one string for many identical values).
+    - Accelerated comparison via `==` (replacing `.equals()`).
+  - **Danger:** Uncontrolled use leads to **growth of the Pool, which is never cleared** (before Java 7). Since Java 7+, interned strings reside in the heap and can be collected by GC if the ClassLoader is unloaded.
+
+---
+
+### **8. Escape Analysis: Compiler Magic for Optimization**
+
+- **Escape Analysis (EA)** — JIT compiler (C2) analysis determining the **visibility scope** of a created object.
+  - **NoEscape**: The object does not leave the method and/or thread bounds.
+  - **ArgEscape**: The object is passed to another method but does not "escape" the thread.
+  - **GlobalEscape**: The object is published (saved to a static field, passed to another thread).
+- **Based on EA, JIT applies optimizations:**
+  1.  **Scalar Replacement:** If an object is `NoEscape`, JIT **does not allocate it on the heap**. Instead, its fields are transformed into local variables of the method (primitives/references) on the stack. **Ideal optimization:** zero allocation overhead, zero GC overhead.
+      ```java
+      // Before optimization
+      Point p = new Point(x, y);
+      return p.x + p.y;
+      // After Scalar Replacement
+      int p_x = x, p_y = y;
+      return p_x + p_y; // Point object is not created.
+      ```
+  2.  **Stack Allocation:** A special case of Scalar Replacement. Theoretical allocation on the stack, but in HotSpot it is implemented precisely as decomposition.
+  3.  **Lock Elision:** If the monitor of an object is `NoEscape` (e.g., a synchronized block on a local object), the lock **is removed**, as it cannot be contended in another thread.
+
+**Activation:** Enabled by default (`-XX:+DoEscapeAnalysis`). Effective for short-lived, local objects (DTOs, iterators, builders).
+
+---
+
+### **9. Thread Memory (Stack Memory): Frame Architecture**
+
+Each JVM thread has a **private stack**, created when it starts. The stack consists of **stack frames**, pushed on method call and popped on its completion (normal or exceptional).
+
+**Structure of a method frame:**
+
+1.  **Local Variable Array (LVA)**: Array of method variables, indexed from 0.
+    - `this` (for non-static methods) is stored in `LVA[0]`.
+    - Method parameters — in `LVA[1]`, `LVA[2]`, ...
+    - Local variables — in subsequent slots.
+    - Each slot is 32 bits (`int`, `float`, `reference`). `long`/`double` occupy 2 slots.
+2.  **Operand Stack (OS)**: Working area for computations (stack-architecture style). Bytecode instructions (`iload`, `iadd`, `invokevirtual`) operate on this stack (push/pop values).
+    ```java
+    int a = 5; int b = 3; int c = a + b;
+    // Bytecode:
+    iconst_5 // push 5 -> OS
+    istore_1 // pop OS -> LVA[1] (a)
+    iconst_3 // push 3 -> OS
+    istore_2 // pop OS -> LVA[2] (b)
+    iload_1  // push LVA[1] (a) -> OS
+    iload_2  // push LVA[2] (b) -> OS
+    iadd     // pop 2 values, add, push result -> OS
+    istore_3 // pop OS -> LVA[3] (c)
+    ```
+3.  **Reference to Runtime Constant Pool (RCP)**: Pointer to the class's Constant Pool, needed for resolving symbolic references (method names, classes, constants) at runtime.
+
+**Size:** Set by the `-Xss` parameter (default ~1MB). Overflow → `StackOverflowError`. Dynamic expansion → `OutOfMemoryError`.
+
+---
+
+### **10. JIT Compilation: C1, C2, and Adaptive Optimization**
+
+- **JIT (Just-In-Time)** — compilation of "hot" bytecode into native machine code at runtime.
+- **Compilation levels in HotSpot (Tiered Compilation, `-XX:+TieredCompilation`):**
+  - **Interpreter**: Executes bytecode. Zero startup overhead, but low speed.
+  - **C1 (Client Compiler)**: Fast, lightweight compilation. Applies basic optimizations (inlining, simple data flow analysis). Goal — quickly get working native code.
+  - **C2 (Server Compiler)**: Aggressive, heavy optimizing compiler. Uses **complex static analysis** (EA, scalar replacement, loop unrolling, macro- and micro-fusion, memory and barrier optimizations). Compiles **the hottest methods**.
+
+- **Profiling**: JVM collects data about code operation at runtime:
+  - **Method invocation counters.**
+  - **Branching**: Which `if` branch executes more often.
+  - **Type Profile**: Which concrete classes arrive at a polymorphic call (`invokevirtual`). This allows **devirtualization** — replacing a virtual call with a direct one, and then **inlining**.
+
+- **Deoptimization**: The reverse process. If the optimizer's assumptions are violated (e.g., a new type arrives, not accounted for in the profile), JVM **rolls back** the compiled native code back to interpreted bytecode.
+  - **Triggers:** "Stale" profile (class loading, new polymorphic types), debug points (breakpoint), dependency reset. **(simplification)**
+
+**Cycle:** Interpreter → profiling → C1 → profiling → C2 → (deoptimization if necessary). This is **Adaptive Optimization**.
+
+---
+
+### **11. `volatile`: Guarantees of Visibility and Ordering**
+
+- **`volatile`** — a variable modifier providing **guarantees of visibility and ordering** at the memory level, without atomicity for compound operations (`i++`).
+- **Semantics:**
+  1.  **Visibility**: A write to a `volatile` variable by one thread **is guaranteed to become visible** to all subsequent reads of that variable from other threads.
+  2.  **Prevention of Reordering**: JVM and processor cannot reorder read/write operations of a `volatile` variable with other memory operations in a way that violates the **happens-before rule**.
+
+- **Happens-Before**: The formal Java memory model defining **guarantees of visibility of changes between threads**.
+  - **Rule for `volatile` (JLS 17.4.5)**: A write to a `volatile` field **happens-before** every subsequent read of the same field.
+  - **Consequence (Transitivity)**: If thread A writes to `volatile V`, and then thread B reads `V`, then **all memory changes made by thread A before writing to `V` become visible to thread B after reading `V`**.
+    ```java
+    // Thread 1
+    sharedNonVolatileData = ...; // (1)
+    volatileFlag = true;          // (2) volatile write
+    // Thread 2
+    if (volatileFlag) {           // (3) volatile read (will see true)
+        // Here, the value of sharedNonVolatileData from (1) is guaranteed to be visible
+        use(sharedNonVolatileData);
+    }
+    ```
+- **Implementation:** At the processor level, this is usually implemented via **memory barriers** (`Memory Barrier` or `Fence`). Writing `volatile` includes `StoreStore` + `StoreLoad` barriers. Reading — `LoadLoad` + `LoadStore`.
+
+**Usage:** For completion flags, publishing results (safe publication), in patterns like `double-checked locking` (with `volatile`).
+
+---
+
+### **12. False Sharing: The Hidden Performance Enemy**
+
+- **False Sharing** — performance degradation in multi-threaded systems, occurring when two independent **frequently modified** fields (`M1` and `M2`), belonging to different objects (or different array elements), fall into **the same cache line (cache line, usually 64 bytes)** of the processor.
+- **Mechanism:** Processors maintain cache coherency via the MESI protocol. If a thread on core 1 modifies `M1`, the entire cache line is marked as "modified" (`Modified`), invalidating the same cache line on core 2, even if it only contains `M2`. Core 2, when accessing `M2`, is forced to re-read the line from memory, even though the value `M2` itself hasn't changed. This causes **cascading invalidation** and a "race" for the cache line.
+- **Consequence:** Seemingly independent operations start competing synchronously, causing a sharp drop in scalability.
+
+**Solution — Alignment (Padding, @Contended):**
+
+1.  **Classic padding (pre-Java 8):** Adding "empty" fields to separate critical fields into different cache lines.
+    ```java
+    class Counter {
+        volatile long count1;
+        private long p1, p2, p3, p4, p5, p6, p7; // Padding ~56 bytes
+        volatile long count2;
+    }
+    ```
+2.  **`@sun.misc.Contended` (Java 8+)**: Annotation instructing JVM to **automatically add padding** around a field or the entire class.
+    ```java
+    import jdk.internal.vm.annotation.Contended;
+    public class StripedCounter {
+        @Contended // JVM will add padding (~128 bytes) around each field
+        volatile long cell1;
+        @Contended
+        volatile long cell2;
+    }
+    ```
+
+    - Requires `-XX:-RestrictContended` for use outside `java.base`.
+    - Widely used in JDK internals (`LongAdder`, `Thread`, `ForkJoinPool`).
+
+- **Alternatives:** Designing data structures so that threads work with independent memory areas (local variables, `ThreadLocal`), or using thread-local structures like `LongAdder`.
+
+**Diagnosis:** Profilers (VTune, `perf`) can track events like `RESOURCE_STALLS.L1D_MISS_CYCLES` or `MEM_LOAD_RETIRED.L2_MISS`. In Java — empirically, by performance degradation when adding seemingly independent operations.
+
+### Once again, and perhaps a bit more clearly ->
+
+## **PART 1: JVM MEMORY ARCHITECTURE - MACRO LEVEL**
+
+### **Heap: The Dominant Structure in JVM**
+
+**Physical organization (64-bit HotSpot JVM)**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     HEAP (Max: 32/64 TB)                    │
+├──────────────┬─────────────────┬────────────────────────────┤
+│  YOUNG GEN   │                 │        OLD GEN             │
+│  (1-3 regions) │                 │       (2/3 of heap)        │
+├──────────────┼─────────────────┼────────────────────────────┤
+│    EDEN      │   SURVIVOR S0   │                            │
+│   (80% YG)   │   SURVIVOR S1   │       Long-lived           │
+│              │   (10% YG each) │       objects, survived    │
+│              │                 │       many GCs             │
+├──────────────┴─────────────────┴────────────────────────────┤
+│                     METASPACE                               │
+│  (Class metadata, methods, constants, annotations)          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Quantitative parameters (default)**:
+
+- `-Xms` / `-Xmx`: Initial/Maximum heap size
+- `-XX:NewRatio=2`: OldGen:YoungGen = 2:1
+- `-XX:SurvivorRatio=8`: Eden:Survivor = 8:1 (each Survivor)
+- `-XX:MaxTenuringThreshold=15`: Maximum age for promotion
+
+---
+
+### **Object Lifecycle: Detailed Chronology**
+
+#### **Phase 1: Allocation in Eden**
+
+```java
+public class AllocationPatterns {
+    // TLAB (Thread-Local Allocation Buffer) - key optimization
+    static void demonstrateTLAB() {
+        // When creating an object:
+        // 1. Check: is there enough space in the current TLAB?
+        // 2. If yes: pointer bump allocation (pointer += size)
+        // 3. If no: request a new TLAB from Eden
+
+        // TLAB size is configurable:
+        // -XX:TLABSize=512k (size)
+        // -XX:+ResizeTLAB (automatic resize)
+
+        for (int i = 0; i < 100_000; i++) {
+            // 99% of objects are allocated here
+            Object obj = new Object(); // ~12 bytes + overhead
+        }
+    }
+}
+```
+
+**Allocation mechanics**:
+
+1. **Pointer Bump in TLAB**: `current_ptr += object_size`
+2. **Zeroing memory**: JVM zeroes memory for safety
+3. **Setting Mark Word**: `mark = hash/age/lock_bits`
+4. **Setting Klass Pointer**: reference to object's `Class`
+
+**Cost**: 10-20 CPU cycles for a small object
+
+---
+
+#### **Phase 2: First Minor GC**
+
+**Trigger**: Eden is 80-90% full (adaptive)
+
+**Copying Collector Algorithm**:
+
+```cpp
+// HotSpot pseudo-code (Young GC)
+void youngGC() {
+    // 1. Stop-The-World: suspend all threads
+    stop_all_threads();
+
+    // 2. Root scanning (very fast)
+    scan_roots();
+
+    // 3. Copy live objects from Eden and From-Survivor to To-Survivor
+    for (Object obj : Eden + From_Survivor) {
+        if (is_alive(obj)) {
+            new_location = copy_to(obj, To_Survivor);
+            forward_pointer(obj, new_location); // To update references
+        }
+    }
+
+    // 4. Swap Survivor spaces
+    swap_survivors();
+
+    // 5. Age objects in Survivor
+    for (Object obj in To_Survivor) {
+        obj.age++;
+        if (obj.age >= threshold) {
+            promote_to_old_gen(obj);
+        }
+    }
+
+    // 6. Resume
+    resume_all_threads();
+}
+```
+
+**Critical details**:
+
+- **Card Table**: Bitmap for tracking references from OldGen to YoungGen
+- **Remembered Sets**: In G1/ZGC for tracking inter-region references
+
+---
+
+#### **Phase 3: Promotion to Old Generation**
+
+**Promotion conditions**:
+
+1. **Age threshold**: `age >= MaxTenuringThreshold` (usually 15)
+2. **Survivor size**: If Survivor overflows, oldest objects are promoted
+3. **Large objects**: > `-XX:PretenureSizeThreshold` (usually 1MB) go directly to OldGen
+
+```java
+// Example: creating long-lived objects
+static void createLongLivedObjects() {
+    List<byte[]> longLived = new ArrayList<>();
+
+    // These objects will survive several Minor GCs
+    for (int i = 0; i < 100; i++) {
+        // 100KB - enough for promotion after several GCs
+        byte[] data = new byte[102400];
+        longLived.add(data);
+
+        // Create garbage to provoke GC
+        for (int j = 0; j < 1000; j++) {
+            byte[] garbage = new byte[1024]; // Will be collected
+        }
+    }
+}
+```
+
+---
+
+### **Garbage Collector Models: Evolution of Algorithms**
+
+#### **1. Serial Collector (Mark-Sweep-Compact)**
+
+```
+Algorithm:
+  1. Mark: Traverse reachability graph from GC Roots
+  2. Sweep: Free unmarked areas
+  3. Compact: Defragmentation (optional)
+
+Features:
+  - Single-threaded (STW for the entire time)
+  - Simple, low overhead
+  - Ideal for embedded and client applications
+```
+
+#### **2. Parallel / Throughput Collector**
+
+```
+Algorithm:
+  - Multi-threaded versions of Serial for all phases
+  - Goal: maximize throughput (application/GC)
+
+Configuration:
+  -XX:+UseParallelGC
+  -XX:ParallelGCThreads=(CPU cores)
+  -XX:MaxGCPauseMillis=200 (target)
+  -XX:GCTimeRatio=99 (99% time for application)
+
+Usage: batch processing, ETL, scientific computing
+```
+
+#### **3. CMS - Concurrent Mark Sweep (deprecated)**
+
+```cpp
+// CMS phases:
+1. Initial Mark (STW)      // Fast, only direct roots
+2. Concurrent Mark         // Concurrent with application
+3. Remark (STW)           // Account for changes during concurrent mark
+4. Concurrent Sweep       // Cleanup
+
+Problems:
+  - Fragmentation (no compaction)
+  - Concurrent Mode Failure on rapid filling
+  - High CPU usage in concurrent phases
+```
+
+#### **4. G1 - Garbage First (default since Java 9)**
+
+```
+Architecture:
+  - Heap divided into ~2000 regions (1-32MB)
+  - Young generation = set of regions (not fixed)
+  - Humongous regions for objects >50% region
+
+Algorithm:
+  1. Concurrent marking (like CMS)
+  2. Evacuation: copying live objects from "garbage first" regions
+  3. Compaction on-the-fly
+
+Configuration:
+  -XX:+UseG1GC
+  -XX:G1HeapRegionSize={1,2,4,8,16,32}M
+  -XX:MaxGCPauseMillis=200
+  -XX:InitiatingHeapOccupancyPercent=45
+```
+
+#### **5. ZGC / Shenandoah (Low-Latency)**
+
+```
+Innovations:
+  - Load barriers instead of write barriers
+  - Colored pointers (metadata in pointers)
+  - Region-based like G1, but all phases concurrent
+
+ZGC pointer structure:
+  ┌─────────┬──────┬──────┬──────────────────────┐
+  │ 42 bits │ 4b   │ 4b   │ 14b                  │
+  │ Address │ 0000 │ Mark │ Unused               │
+  └─────────┴──────┴──────┴──────────────────────┘
+
+Advantages:
+  - STW < 1ms regardless of heap size
+  - Support for terabyte heaps
+```
+
+---
+
+## **PART 2: STOP-THE-WORLD - ARCHITECTURAL VIEW**
+
+### **Anatomy of a JVM Pause**
+
+```cpp
+// HotSpot VM safepoint operation
+void SafepointSynchronize::begin() {
+    // 1. Set safepoint flag
+    _state = _synchronizing;
+
+    // 2. Stop all threads at safe points
+    for (JavaThread* thread = Threads::first(); thread; thread = thread->next()) {
+        thread->safepoint_state()->examine_state_of_thread();
+
+        // Thread must stop in one of:
+        // - Between bytecode instructions (in interpreted)
+        // - At safepoint polling page (in compiled code)
+        // - Blocked in native code
+    }
+
+    // 3. All threads stopped
+    _state = _synchronized;
+
+    // 4. Perform operation (GC, deopt, etc.)
+    do_operation();
+
+    // 5. Resume
+    _state = _not_synchronized;
+}
+```
+
+### **Safepoint Polling in Compiled Code**
+
+```assembly
+; x86_64 generated JIT code
+compiled_method:
+    ; Prologue
+    push   rbp
+    mov    rbp, rsp
+
+    ; Method body
+    mov    rax, [rsi+0x10]  ; Load field
+    add    rax, 0x1
+    mov    [rsi+0x10], rax  ; Store
+
+    ; Safepoint poll (every ~1000 instructions)
+    test   byte ptr [rip+safepoint_page], 0xff
+    jnz    safepoint_handler  ; Jump if safepoint
+
+    ; Continue
+    ret
+
+safepoint_page:  ; Memory page, changed on safepoint
+    .byte 0
+```
+
+---
+
+## **PART 3: MEMORY LEAK - SYSTEMATIC ANALYSIS**
+
+### **Memory Leak Typology**
+
+#### **1. Classic leak via statics**
+
+```java
+public class ClassicLeak {
+    // Global cache without limits
+    private static final Map<Key, Value> CACHE = new HashMap<>();
+
+    // Leak: objects never removed
+    public void processRequest(Request req) {
+        Key key = extractKey(req);
+        Value val = computeExpensiveValue(req);
+        CACHE.put(key, val);  // Forever in memory
+    }
+
+    // Solution 1: WeakHashMap
+    private static final Map<Key, Value> WEAK_CACHE =
+        Collections.synchronizedMap(new WeakHashMap<>());
+
+    // Solution 2: Guava Cache with policies
+    private static final Cache<Key, Value> GUAVA_CACHE =
+        CacheBuilder.newBuilder()
+            .maximumSize(10000)
+            .expireAfterWrite(10, TimeUnit.MINUTES)
+            .weakKeys()
+            .build();
+}
+```
+
+#### **2. ThreadLocal in thread pool**
+
+```java
+public class ThreadLocalLeak {
+    private static final ThreadLocal<ByteBuffer> BUFFER_HOLDER =
+        new ThreadLocal<ByteBuffer>() {
+            @Override
+            protected ByteBuffer initialValue() {
+                return ByteBuffer.allocateDirect(1024 * 1024); // 1MB direct buffer
+            }
+        };
+
+    // In web application (Tomcat):
+    // Thread returns to pool after request
+    // ThreadLocal is not automatically cleaned!
+    // Memory accumulates: pool_size * buffer_size
+
+    public void handleRequest(HttpServletRequest req) {
+        ByteBuffer buffer = BUFFER_HOLDER.get();
+        // use...
+        // FORGET: BUFFER_HOLDER.remove();
+    }
+}
+```
+
+#### **3. Incorrect event listeners**
+
+```java
+public class ListenerLeak {
+    private final List<EventListener> listeners = new CopyOnWriteArrayList<>();
+
+    public void registerListener(EventListener listener) {
+        listeners.add(listener);
+    }
+
+    // NO unregisterListener method!
+    // Listener holds reference to outer object
+    // → leak of entire reference chain
+}
+```
+
+#### **4. JNI/Off-Heap leaks**
+
+```java
+public class NativeMemoryLeak {
+    static {
+        System.loadLibrary("native");
+    }
+
+    private native long allocateNativeMemory(int size);
+    private native void freeNativeMemory(long pointer);
+
+    public void leak() {
+        long ptr = allocateNativeMemory(1024 * 1024); // 1MB native
+        // Forget to call freeNativeMemory(ptr)
+        // → leak in native heap (not visible in Java heap dump!)
+    }
+}
+```
+
+### **Leak Diagnostics:**
+
+```bash
+# 1. Real-time monitoring
+jstat -gc <pid> 1s  # Check OldGen growth after Full GC
+
+# 2. Taking heap dump (production with caution!)
+jmap -dump:live,format=b,file=heap.hprof <pid>
+
+# 3. Analysis in Eclipse MAT
+#    Key queries:
+#    - "Leak Suspects Report"
+#    - "Top Consumers"
+#    - "Histogram grouped by class"
+#    - "Path to GC Roots"
+
+# 4. Command line analysis
+jmap -histo:live <pid> | head -20  # Largest classes
+
+# 5. JFR (Java Flight Recorder) for dynamic analysis
+jcmd <pid> JFR.start duration=60s filename=leak.jfr
+```
+
+---
+
+## **PART 4: METASPACE - CLASS METADATA**
+
+### **Evolution from PermGen to Metaspace**
+
+**PermGen (≤ Java 7)**:
+
+```
+┌─────────────────────────────────┐
+│           PERMGEN               │
+│  (Fixed size, part of Heap)     │
+├─────────────────────────────────┤
+│ • Class metadata                │
+│ • Bytecode                      │
+│ • Runtime constant pool         │
+│ • String intern table           │
+│ • JIT code cache (partially)    │
+└─────────────────────────────────┘
+Problems: OOM, manual size tuning, inefficient GC
+```
+
+**Metaspace (Java 8+)**:
+
+```
+┌─────────────────────────────────┐
+│         NATIVE MEMORY           │
+│  (Not Heap, managed by OS)      │
+├─────────────────────────────────┤
+│     METASPACE                   │
+│  ┌─────────────────────────┐    │
+│  │  Non-Class Metaspace    │    │
+│  │  ┌───────────────────┐  │    │
+│  │  │ Chunk (2MB)       │  │    │
+│  │  │ • Constant Pool   │  │    │
+│  │  │ • Annotations     │  │    │
+│  │  │ • Methods         │  │    │
+│  │  └───────────────────┘  │    │
+│  │  ...                    │    │
+│  └─────────────────────────┘    │
+│                                 │
+│  ┌─────────────────────────┐    │
+│  │   Class Metaspace       │    │
+│  │  (Compressed Class      │    │
+│  │   Space, if enabled)    │    │
+│  │  • Klass structures     │    │
+│  │  • vtables              │    │
+│  │  • itables              │    │
+│  └─────────────────────────┘    │
+└─────────────────────────────────┘
+```
+
+### **Metaspace Structure**
+
+```cpp
+// Simplified Metaspace structure in HotSpot
+class Metaspace {
+    // Arena-based allocator
+    Metachunk* _chunks;  // List of chunks
+
+    // Statistics
+    size_t _used_words;
+    size_t _capacity_words;
+    size_t _committed_words;
+};
+
+// Metadata chunk
+class Metachunk {
+    // Header
+    size_t _word_size;
+    Metablock* _blocks;
+
+    // Type: Non-Class (methods, constants) or Class (Klass)
+    MetaspaceType _type;
+};
+```
+
+### **ClassLoader Leak - Main Cause of OOM: Metaspace**
+
+```java
+public class ClassLoaderLeak {
+    // Web application, reloaded in Tomcat
+    public void leak() throws Exception {
+        while (true) {
+            // 1. Create isolated ClassLoader
+            URLClassLoader loader = new URLClassLoader(
+                new URL[]{new URL("file:///app.jar")},
+                null  // Parent = null (isolation)
+            );
+
+            // 2. Load class
+            Class<?> clazz = loader.loadClass("com.example.SomeClass");
+            Object instance = clazz.newInstance();
+
+            // 3. Store reference somewhere global
+            GlobalCache.store(instance);  // LEAK!
+
+            // 4. ClassLoader cannot be unloaded,
+            //    because its classes are reachable through instance
+            //    → Metaspace grows with each reload
+        }
+    }
+}
+```
+
+**ClassLoader leak diagnostics**:
+
+```bash
+# 1. Check number of ClassLoaders
+jcmd <pid> VM.classloader_stats
+
+# 2. Dump classes
+jmap -clstats <pid>
+
+# 3. Enable class loading logging
+-XX:+TraceClassLoading -XX:+TraceClassUnloading
+
+# 4. Limit Metaspace
+-XX:MaxMetaspaceSize=256m
+-XX:MetaspaceSize=64m
+```
+
+---
+
+## **PART 5: STRING POOL AND INTERNING**
+
+### **String Pool: Hash Table in Heap**
+
+```java
+// Internal String Pool implementation (StringTable)
+class StringTable {
+    // Hash table with separate chaining
+    private static Entry[] table;
+
+    static class Entry {
+        final String str;
+        final int hash;
+        Entry next;
+    }
+
+    // Main intern() method
+    static String intern(String str) {
+        int hash = hashString(str);
+        int index = hash & (table.length - 1);
+
+        for (Entry e = table[index]; e != null; e = e.next) {
+            if (e.hash == hash && str.equals(e.str)) {
+                return e.str;  // Existing string
+            }
+        }
+
+        // Adding new string
+        Entry newEntry = new Entry(str, hash, table[index]);
+        table[index] = newEntry;
+        return str;
+    }
+}
+```
+
+### **String Pool Evolution**
+
+**Java 6 and earlier**: In PermGen, fixed size, not cleared
+
+```bash
+-XX:StringTableSize=1009  # Small and fixed
+```
+
+**Java 7+**: In Heap, dynamic size, cleared by GC
+
+```bash
+-XX:StringTableSize=60013  # Size can be configured
+```
+
+### **When to use intern()?**
+
+**Anti-pattern**:
+
+```java
+// NEVER DO THIS
+public void processLine(String line) {
+    String interned = line.intern();  // All strings in pool!
+    // Pool fills up, GC won't help
+}
+```
+
+**Possibly correct usage**:
+
+```java
+public class TokenProcessor {
+    // Limited set of known tokens
+    private static final Set<String> KNOWN_TOKENS =
+        Set.of("GET", "POST", "PUT", "DELETE", "HEAD").stream()
+            .map(String::intern)
+            .collect(Collectors.toSet());
+
+    // Frequently used enum-like values
+    public void process(HttpMethod method) {
+        String m = method.name().intern();  // Only 6 possible values
+        // Fast comparison via ==
+        if (m == "GET") {  // SAFE: "GET" guaranteed interned
+            // ...
+        }
+    }
+}
+```
+
+**CSV parser optimization**:
+
+```java
+public class CSVParser {
+    private final Map<String, String> pool = new HashMap<>();
+
+    public String internIfFrequent(String value) {
+        // Strategy: intern only frequently repeating values
+        if (value.length() > 10) return value;  // Long strings not interned
+
+        String cached = pool.get(value);
+        if (cached != null) return cached;
+
+        // Add only if occurs frequently
+        if (shouldIntern(value)) {
+            String interned = value.intern();
+            pool.put(value, interned);
+            return interned;
+        }
+        return value;
+    }
+}
+```
+
+---
+
+## **PART 6: JIT COMPILATION - C1, C2, ADAPTIVE OPTIMIZATIONS**
+
+### **Three-Tier Compilation (Tiered Compilation)**
+
+```
+┌─────────────────────────────────────────────────┐
+│           INTERPRETER (Level 0)                 │
+│  • Zero startup overhead                        │
+│  • Slow execution                               │
+│  • Profile collection: counters, types, branches│
+└─────────────────┬───────────────────────────────┘
+                  ↓ (1000+ method calls)
+┌─────────────────────────────────────────────────┐
+│           C1 (CLIENT) COMPILER                  │
+│  • Fast compilation (level 1 optimizations)     │
+│  • Inlining small methods                       │
+│  • Local optimizations                          │
+│  • Continue profile collection                  │
+└─────────────────┬───────────────────────────────┘
+                  ↓ (10000+ method calls)
+┌─────────────────────────────────────────────────┐
+│           C2 (SERVER) COMPILER                  │
+│  • Aggressive optimizations (level 4)           │
+│  • Global data flow analysis                    │
+│  • Escape Analysis and Scalar Replacement       │
+│  • Devirtualization and inlining                │
+│  • Vectorization (Auto-Vectorization)           │
+└─────────────────────────────────────────────────┘
+```
+
+### **Compilation Configuration**
+
+```bash
+# Compilation levels (0-4)
+-XX:CompileThreshold=10000        # Threshold for C2
+-XX:Tier3InvocationThreshold=2000 # For C1->C2
+-XX:Tier4InvocationThreshold=15000
+
+# Cache sizes
+-XX:ReservedCodeCacheSize=240m    # Native code cache
+-XX:InitialCodeCacheSize=160m
+
+# Compiler control
+-XX:+TieredCompilation           # Enable multi-tier (default)
+-XX:-TieredCompilation          # Only C2 (slower start)
+-XX:CompileCommand=exclude,com/example/expensiveMethod
+```
+
+### **Profiling and Devirtualization**
+
+```java
+public class DevirtualizationExample {
+    interface Shape {
+        double area();
+    }
+
+    class Circle implements Shape {
+        private final double radius;
+        public double area() { return Math.PI * radius * radius; }
+    }
+
+    class Square implements Shape {
+        private final double side;
+        public double area() { return side * side; }
+    }
+
+    public double totalArea(List<Shape> shapes) {
+        double total = 0;
+        for (Shape shape : shapes) {
+            total += shape.area();  // Virtual call
+        }
+        return total;
+    }
+}
+```
+
+**Optimization process**:
+
+1. **Interpreter**: Collects type profile
+   - `Shape#area()`: 95% Circle, 5% Square
+2. **C1 compiler**: Adds type check
+   ```java
+   if (shape.getClass() == Circle.class) {
+       total += ((Circle)shape).area();  // Direct call
+   } else {
+       total += shape.area();  // Virtual call
+   }
+   ```
+3. **C2 compiler**: If profile is stable
+   - Creates two specialized loop versions
+   - For Circle: completely removes checks
+   - For Square: separate rare path
+
+### **Escape Analysis and Scalar Replacement**
+
+```java
+public class Point {
+    private final int x, y;
+    public Point(int x, int y) { this.x = x; this.y = y; }
+    public int getX() { return x; }
+    public int getY() { return y; }
+}
+
+public int compute() {
+    Point p = new Point(10, 20);  // NoEscape: doesn't leave method
+    return p.getX() + p.getY();
+}
+
+// After Scalar Replacement:
+public int compute_optimized() {
+    // Point object not created!
+    int p_x = 10;  // Field decomposed into local variable
+    int p_y = 20;  // Second field decomposed
+    return p_x + p_y;
+}
+```
+
+**Application conditions**:
+
+1. **NoEscape**: Object not passed outside method
+2. **ArgEscape**: Passed, but not published
+3. **GlobalEscape**: Published (not optimized)
+
+**Enable/Disable**:
+
+```bash
+-XX:+DoEscapeAnalysis      # Enable (default)
+-XX:+EliminateAllocations  # Scalar Replacement (default)
+-XX:+PrintEscapeAnalysis   # Logging
+```
+
+---
+
+## **PART 7: VOLATILE AND JAVA MEMORY MODEL**
+
+### **Java Memory Model (JMM)**
+
+**Happens-before rules**:
+
+1. **Program order**: Actions in a thread happen in program order
+2. **Monitor lock**: Releasing a monitor happens-before subsequent acquisition
+3. **Volatile**: Write to volatile happens-before read of same field
+4. **Thread start**: `Thread.start()` happens-before any actions in the thread
+5. **Thread join**: All actions in a thread happen-before `Thread.join()`
+6. **Transitivity**: If A happens-before B and B happens-before C, then A happens-before C
+
+### **Volatile Implementation at Processor Level**
+
+```java
+public class VolatileExample {
+    private volatile boolean flag = false;
+    private int data = 0;
+
+    public void writer() {
+        data = 42;           // (1) Normal write
+        flag = true;         // (2) Volatile write
+    }
+
+    public void reader() {
+        if (flag) {          // (3) Volatile read
+            System.out.println(data); // (4) Will see 42
+        }
+    }
+}
+```
+
+**Memory barriers for x86**:
+
+```assembly
+; writer()
+mov    [data], 42        ; Store data
+; StoreStore barrier (x86 doesn't require)
+mov    [flag], 1         ; Store flag (volatile)
+sfence                   ; StoreLoad barrier (x86 requires)
+
+; reader()
+lfence                   ; LoadLoad barrier (x86 requires)
+mov    rax, [flag]       ; Load flag (volatile)
+test   rax, rax
+jz     .done
+; LoadStore barrier (x86 doesn't require)
+mov    rbx, [data]       ; Load data
+```
+
+### **False Sharing and @Contended**
+
+**False sharing problem**:
+
+```java
+public class FalseSharing {
+    // Two fields in one cache line (64 bytes)
+    volatile long value1;  // [0-7]
+    // ... 56 bytes ...
+    volatile long value2;  // [56-63]
+
+    // Thread 1: constantly writes to value1
+    // Thread 2: constantly reads value2
+    // RESULT: cache line constantly invalidated
+    // → performance drops significantly
+}
+```
+
+**Solution with @Contended**:
+
+```java
+public class PaddedData {
+    // JVM will add 128 bytes padding on each side
+    @Contended
+    volatile long value1;
+
+    @Contended
+    volatile long value2;
+
+    // Memory layout:
+    // [value1][128 bytes padding][... other fields ...][128 bytes padding][value2]
+}
+```
+
+**Manual solution (pre-Java 8)**:
+
+```java
+public class ManualPadding {
+    volatile long value1;
+    // Explicit padding
+    long p1, p2, p3, p4, p5, p6, p7; // 56 bytes
+
+    volatile long value2;
+    long p8, p9, p10, p11, p12, p13, p14; // Another 56 bytes
+}
+```
+
+**False sharing diagnostics**:
+
+```bash
+# Linux: perf for cache miss monitoring
+perf stat -e cache-misses,cache-references java -jar app.jar
+
+# JVM flags for @Contended
+-XX:-RestrictContended        # Allow use outside java.base
+-XX:ContendedPaddingWidth=128 # Padding size (default 128)
+```
+
+---
+
+## **PART 8: PROFILING AND OPTIMIZATION IN PRACTICE**
+
+### **Scenario: High-Load Service**
+
+**Initial state**:
+
+- 100k RPS, 95th percentile 200ms, heap 8GB
+- Frequent Full GC pauses 2-3 seconds
+
+**Step 1: Data collection**:
+
+```bash
+# 1. JFR for pause analysis
+jcmd <pid> JFR.start duration=60s filename=gc.jfr
+
+# 2. Detailed GC logs
+-XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:gc.log
+
+# 3. Heap dump just before Full GC
+-XX:+HeapDumpBeforeFullGC -XX:HeapDumpPath=/path/to/dumps
+```
+
+**Step 2: Analysis**:
+
+```java
+// Typical problems:
+// 1. Too large Young/Old ratio
+// 2. Frequent promotions due to large Survivor
+// 3. Memory leak in caches
+// 4. Too aggressive allocation rate
+```
+
+**Step 3: Optimization**:
+
+```bash
+# Switch to G1 GC
+-XX:+UseG1GC
+-XX:MaxGCPauseMillis=100
+-XX:InitiatingHeapOccupancyPercent=35  # Start concurrent cycle earlier
+
+# Tune Young Gen
+-XX:NewRatio=1                          # More Young for short-lived
+-XX:SurvivorRatio=6                     # More Eden
+-XX:MaxTenuringThreshold=5              # Faster promotion for medium-lived
+
+# Monitoring
+-XX:+PrintAdaptiveSizePolicy            # How JVM tunes sizes
+-XX:+PrintTenuringDistribution          # Age distribution
+```
+
+### **Anti-patterns and Their Fixes**
+
+**Anti-pattern 1: Manual System.gc()**
+
+```java
+// BAD
+public void processBatch() {
+    // ...
+    System.gc();  // Full GC pause at unpredictable moment
+    // ...
+}
+
+// Solution: rely on JVM or use
+// -XX:+ExplicitGCInvokesConcurrent for G1
+// -XX:+DisableExplicitGC in production
+```
+
+**Anti-pattern 2: Large arrays in Young Gen**
+
+```java
+// BAD: 2MB array in Eden
+byte[] buffer = new byte[2 * 1024 * 1024];
+
+// Solution: direct allocator or tuning
+-XX:PretenureSizeThreshold=3M  # Objects >3MB directly to OldGen
+```
+
+**Anti-pattern 3: String concat in loop**
+
+```java
+// BAD: O(n²) memory
+String result = "";
+for (String item : items) {
+    result += item;  // New StringBuilder each time
+}
+
+// Solution:
+StringBuilder sb = new StringBuilder(estimatedSize);
+for (String item : items) {
+    sb.append(item);
+}
+String result = sb.toString();
+```
+
+---
+
+## **PART 9: SPECIFIC CONFIGURATIONS FOR DIFFERENT SCENARIOS**
+
+### **Microservice (REST API, 4GB heap)**
+
+```bash
+# G1 with aggressive latency goals
+-XX:+UseG1GC
+-XX:MaxGCPauseMillis=50
+-XX:G1HeapRegionSize=4M
+-XX:InitiatingHeapOccupancyPercent=30
+-XX:ConcGCThreads=2
+-XX:ParallelGCThreads=4
+
+# Metaspace limits
+-XX:MaxMetaspaceSize=128M
+-XX:MetaspaceSize=64M
+
+# JIT settings
+-XX:ReservedCodeCacheSize=128M
+-XX:InitialCodeCacheSize=64M
+```
+
+### **Batch Data Processing (32GB heap)**
+
+```bash
+# Throughput oriented
+-XX:+UseParallelGC
+-XX:+UseParallelOldGC
+-XX:ParallelGCThreads=8
+-XX:GCTimeRatio=99
+-XX:MaxGCPauseMillis=500
+
+# Large objects
+-XX:PretenureSizeThreshold=10M
+-XX:SurvivorRatio=10
+
+# Monitoring
+-XX:+PrintGCDetails
+-XX:+PrintGCApplicationStoppedTime
+```
+
+### **Low-Latency System (Financial Transactions)**
+
+```bash
+# ZGC for sub-millisecond pauses
+-XX:+UseZGC
+-XX:MaxGCPauseMillis=1
+-XX:ConcGCThreads=4
+-Xmx16g
+-Xms16g  # Fixed heap
+
+# Disable bias locking for stability
+-XX:-UseBiasedLocking
+
+# Aggressive JIT compilation
+-XX:-TieredCompilation  # Only C2
+-XX:CompileThreshold=1000
+```
+
+---
+
+## **PART 10: MONITORING AND DIAGNOSTICS IN REAL TIME**
+
+### **Utilities and Their Purpose**
+
+1. **jcmd - universal command**:
+
+```bash
+# Full list of available commands
+jcmd <pid> help
+
+# Heap dump
+jcmd <pid> GC.heap_dump filename=heap.hprof
+
+# Class status
+jcmd <pid> GC.class_histogram
+
+# JFR management
+jcmd <pid> JFR.start duration=60s filename=recording.jfr
+```
+
+2. **jstat - GC statistics**:
+
+```bash
+# Every second, 10 times
+jstat -gc <pid> 1s 10
+
+# Key metrics:
+# S0C/S1C: Survivor capacity
+# S0U/S1U: Survivor used
+# EC/EU: Eden capacity/used
+# OC/OU: Old capacity/used
+# YGC/YGCT: Young GC count/time
+# FGC/FGCT: Full GC count/time
+```
+
+3. **async-profiler - low-level profiler**:
+
+```bash
+# CPU profiling
+./profiler.sh -d 30 -f cpu.svg <pid>
+
+# Allocation profiling
+./profiler.sh -d 30 -e alloc -f alloc.svg <pid>
+
+# Contended lock profiling
+./profiler.sh -d 30 -e lock -f lock.svg <pid>
+```
+
+### **Configuring GC Logs for Analysis**
+
+```bash
+# Detailed logs with timestamps
+-Xlog:gc*,gc+age=trace,gc+heap=debug:file=gc.log:uptime,level,tags
+
+# For G1 specifically
+-Xlog:gc+g1*=debug,gc+phases=debug:file=g1.log
+
+# Parsing logs with utilities
+# 1. GCViewer: visualization
+# 2. gceasy.io: online analysis
+# 3. jClarity Censum: commercial tool
+```
