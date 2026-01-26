@@ -17,8 +17,8 @@ images: ['/static/images/my-image.jpg'] # опционально: изображ
 
 <img
   src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Tred-G.svg/500px-Tred-G.svg.png"
-  height="300"
-  width="200"
+  height={300}
+  width={200}
 />
 
 > Example of a directed acyclic graph
@@ -100,7 +100,7 @@ For graph `(a,b,c,d,e)` with edges `(a,b), (a,c), (a,d), (a,e), (b,d), (c,d), (c
 
 **Idea:** Run a depth-first traversal (DFS) of the graph. Add a vertex to the final list at the moment of **finishing** its processing (when all its descendants have been visited). The final list then needs to be **reversed**.
 
-<img src="https://upload.wikimedia.org/wikipedia/commons/6/60/Tarjan%27s_Algorithm_Animation.gif" width=400>
+<img src="https://upload.wikimedia.org/wikipedia/commons/6/60/Tarjan%27s_Algorithm_Animation.gif" width={400}>
 
 **Steps (with coloring for cycle detection):**
 

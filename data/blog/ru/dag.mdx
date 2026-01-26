@@ -17,8 +17,8 @@ images: ['/static/images/my-image.jpg'] # опционально: изображ
 
 <img
   src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Tred-G.svg/500px-Tred-G.svg.png"
-  height="300"
-  width="200"
+  height={300}
+  width={200}
 />
 
 > Example of a directed acyclic graph
@@ -100,7 +100,7 @@ images: ['/static/images/my-image.jpg'] # опционально: изображ
 
 **Идея:** Запускаем глубокий обход графа (DFS). Вершину добавляем в итоговый список в момент **окончания** её обработки (когда все её потомки уже посещены). Итоговый список нужно потом **перевернуть**.
 
-<img src="https://upload.wikimedia.org/wikipedia/commons/6/60/Tarjan%27s_Algorithm_Animation.gif" width=400>
+<img src="https://upload.wikimedia.org/wikipedia/commons/6/60/Tarjan%27s_Algorithm_Animation.gif" width={400}>
 
 **Шаги (с раскраской для обнаружения циклов):**
 
