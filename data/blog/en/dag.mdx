@@ -15,10 +15,6 @@ images: ['/static/images/my-image.jpg'] # опционально: изображ
 
 **A Directed Acyclic Graph (DAG)** is a directed graph without cycles.
 
-![Example of a directed acyclic graph](https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Tred-G.svg/500px-Tred-G.svg.png)
-
-> Example of a directed acyclic graph
-
 Let's break it down:
 
 1.  **Graph:** A structure consisting of **vertices (nodes)** and **edges (arcs)** connecting them.
@@ -96,7 +92,6 @@ For graph `(a,b,c,d,e)` with edges `(a,b), (a,c), (a,d), (a,e), (b,d), (c,d), (c
 
 **Idea:** Run a depth-first traversal (DFS) of the graph. Add a vertex to the final list at the moment of **finishing** its processing (when all its descendants have been visited). The final list then needs to be **reversed**.
 
-![Tarjan's Algorithm Animation](https://upload.wikimedia.org/wikipedia/commons/6/60/Tarjan%27s_Algorithm_Animation.gif)
 **Steps (with coloring for cycle detection):**
 
 - **White** — vertex not visited.

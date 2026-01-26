@@ -15,9 +15,6 @@ images: ['/static/images/my-image.jpg'] # опционально: изображ
 
 **Directed Acyclic Graph (DAG)** — это направленный граф без циклов.
 
-<img
-![Example of a directed acyclic graph](https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Tred-G.svg/500px-Tred-G.svg.png)
-
 Разберем по частям:
 
 1.  **Граф:** Структура, состоящая из **вершин (узлов)** и **ребер (дуг)**, соединяющих их.
@@ -95,7 +92,6 @@ images: ['/static/images/my-image.jpg'] # опционально: изображ
 
 **Идея:** Запускаем глубокий обход графа (DFS). Вершину добавляем в итоговый список в момент **окончания** её обработки (когда все её потомки уже посещены). Итоговый список нужно потом **перевернуть**.
 
-![Tarjan's Algorithm Animation](https://upload.wikimedia.org/wikipedia/commons/6/60/Tarjan%27s_Algorithm_Animation.gif)
 **Шаги (с раскраской для обнаружения циклов):**
 
 - **Белый** — вершина не посещена.
