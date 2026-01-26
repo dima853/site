@@ -1,0 +1,177 @@
+---
+title: 'What is a DAG? The Essence in a Nutshell (Part 1)'
+date: '2026-01-26'
+
+summary: ''
+draft: false # если true - пост не будет опубликован
+authors: ['default'] # автор из data/authors/
+layout: PostLayout # макет поста
+images: ['/static/images/my-image.jpg'] # опционально: изображения
+---
+
+**You know what build scripts like Make, Git history, the IOTA blockchain, and AI in TensorFlow have in common? They all operate on the same foundation — the DAG!** This isn't just abstract mathematics: from software builds to analyzing cause-and-effect in epidemiology, DAGs are everywhere you need to order dependencies without cycles.
+
+\*simplified article
+
+**A Directed Acyclic Graph (DAG)** is a directed graph without cycles.
+
+<img
+  src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Tred-G.svg/500px-Tred-G.svg.png"
+  height="300"
+  width="200"
+/>
+
+> Example of a directed acyclic graph
+
+Let's break it down:
+
+1.  **Graph:** A structure consisting of **vertices (nodes)** and **edges (arcs)** connecting them.
+2.  **Directed:** Each edge has a direction — it goes **from** one vertex **to** another. Denoted by an arrow: `A -> B`.
+3.  **Acyclic:** The graph **has no cycles**. You cannot start from some vertex, follow the direction of the arrows, and return to the starting vertex. This is a fundamental property that establishes order and causality.
+
+**A simple analogy:** Imagine one-way streets in a city where you cannot drive around the block and return to your starting point. Or a chain of tasks where some tasks must be strictly completed before others.
+
+---
+
+### I. In-Depth Definitions and Mathematical Properties
+
+#### 1. Reachability Relation, Transitive Closure, and Transitive Reduction
+
+These are key concepts for understanding the "power" of a DAG.
+
+- **Reachability Relation:** If there is a path from vertex `u` to vertex `v` (following the arrows), then we say `v` is **reachable** from `u`. This relation is a **partial order** on the set of vertices of a DAG.
+- **Transitive Closure:** A new graph built on the same vertices, where an edge `u -> v` is added **for every pair** of vertices where `v` is reachable from `u`. Simply put, it makes implicit connections explicit.
+  - _Example from the article:_ If the original DAG has edges `u -> v` and `v -> w`, then the transitive closure will also include the edge `u -> w`.
+  - **Why is it needed?** To quickly answer the question "is one vertex reachable from another?" — now it can be checked in O(1) (by checking for a direct edge).
+- **Transitive Reduction:** The graph with the **minimum** number of edges that preserves the same reachability relation. This is the "skeleton" of the DAG, where all redundant edges (which duplicate longer paths) are removed.
+  - _Example:_ In a graph with edges `u -> v`, `v -> w`, and `u -> w`, the edge `u -> w` is redundant because a path from `u` to `w` already exists via `v`. It can be removed.
+  - **Why is it needed?** Simplifies visualization and analysis by removing "noise." A **Hasse diagram** in order theory is precisely a drawing of the transitive reduction.
+
+**Key Takeaway:** The same partial order (reachability relation) can be represented by different DAGs (e.g., the full one and its reduction). Transitive closure and transitive reduction are the canonical forms of this representation.
+
+#### 2. Topological Sorting
+
+**The cornerstone of DAG theory.**
+
+> Topological — relating to topology, a branch of mathematics that studies properties of figures and spaces that remain unchanged under continuous deformations (stretching, compressing, bending) without tearing or gluing. It describes qualitative structure, connectedness, and neighborhood of elements, ignoring precise metric characteristics (distances, angles).
+
+**Here, the term "topological" is used in a narrower, figurative sense, but there is a connection to the general idea!**
+
+**Analogy:**
+
+- In general topology, we study the continuous order of points in space.
+- In a DAG, we study the partial order of vertices defined by directed edges.
+
+---
+
+- **Definition:** A topological sort is a linear ordering of vertices such that for every edge `u -> v`, vertex `u` comes **before** `v` in this order.
+  > A topological sort exists only for a Directed Acyclic Graph (DAG).
+- **Fundamental Theorem:** **A directed graph is acyclic (a DAG) if and only if it has a topological ordering.**
+- **Non-Uniqueness:** In general, there can be many topological sorts. It is unique only when the DAG is itself a single directed path (a Hamiltonian path).
+
+---
+
+### **Algorithms** (two main approaches) ⬇️
+
+> Topological sorting algorithms are needed to process any system with dependencies where a correct execution order must be determined.
+
+#### **A) Kahn's Algorithm (1962) — "intuitive," based on in-degrees**
+
+**Idea:** Start with vertices that have **no incoming edges** (nothing depends on them). Remove them from the graph and repeat the process.
+
+**Steps:**
+
+1.  For each vertex `v`, compute the number of incoming edges (`in_degree[v]`).
+2.  Find all vertices with `in_degree[v] = 0` and place them in a queue (or list).
+3.  While the queue is not empty:
+    - Remove a vertex `u` from the front of the queue and append it to the result order `result`.
+    - For **each** neighbor `v` (where an edge goes from `u` to `v`):
+      - Decrement `in_degree[v]` by 1 (as if "removing" the edge `u → v`).
+      - If `in_degree[v]` becomes 0, add `v` to the queue.
+4.  If the length of `result` is less than the number of vertices in the graph — **a cycle exists in the graph**.
+
+**Example:**
+For graph `(a,b,c,d,e)` with edges `(a,b), (a,c), (a,d), (a,e), (b,d), (c,d), (c,e), (d,e)`:
+
+- Step 0: Vertex `a` has no incoming edges (`in_degree=0`). Take `a`.
+- Step 1: After removing `a`, vertices `b` and `c` get `in_degree` of 0. We can take `b` or `c`. Possible orders: `[a, b, c, d, e]` or `[a, c, b, d, e]`.
+
+#### **B) Tarjan's Algorithm (1976) — "elegant," based on DFS (Depth-First Search)**
+
+**Idea:** Run a depth-first traversal (DFS) of the graph. Add a vertex to the final list at the moment of **finishing** its processing (when all its descendants have been visited). The final list then needs to be **reversed**.
+
+<img src="https://upload.wikimedia.org/wikipedia/commons/6/60/Tarjan%27s_Algorithm_Animation.gif" width=400>
+
+**Steps (with coloring for cycle detection):**
+
+- **White** — vertex not visited.
+- **Gray** — vertex is in the current recursive traversal stack (we started processing it but haven't finished).
+- **Black** — vertex fully processed (all its descendants visited).
+
+1.  For each **white** vertex `u`, run DFS-visit(`u`):
+2.  Color `u` **gray**.
+3.  Recursively visit **all** its neighbors `v` (via outgoing edges).
+    - If a **gray** vertex is encountered — a **cycle** is found! Sorting is impossible.
+4.  After processing all neighbors, color `u` **black** and **prepend it to the list** `result`.
+5.  At the end, **reverse** the `result` list (or equivalently, if vertices were prepended, no reversal is needed).
+
+**Why does this work?** When we color a vertex black, all vertices reachable from it are already processed and black (i.e., they are in the result list). This guarantees that all "successors" of `u` will already be in the list _before it_, and after reversal will end up _after it_.
+
+---
+
+### II. Families of Related Graphs
+
+DAG is a general concept. Its special cases include:
+
+- **Multitree (Mangrove):** A DAG where between any pair of vertices there exists **at most one** directed path. No "crossroads" where different paths can converge and diverge.
+- **Polytree:** A directed tree. Obtained by taking an ordinary undirected tree and assigning directions to edges. A special case of a multitree.
+- **Arborescence:** A polytree with a designated **root**, from which all paths are directed. The classic "tree" in computer science (e.g., a filesystem).
+
+---
+
+### III. Computational Problems and Algorithms (Practical Value)
+
+The power of DAGs lies in the fact that some NP-hard problems for general graphs become efficiently solvable.
+
+1.  **Topological Sorting and Cycle Detection:** Solvable in **O(V+E)**. For most real-world **DAGs**, which are sparse **(E = O(V))**, this effectively means linear time **O(V)**. Used as a first step in many algorithms.
+2.  **Finding Shortest and Longest Paths:**
+    - **In a General Graph:** Shortest path (with non-negative weights) — Dijkstra's algorithm (O(E log V)). Longest path — NP-hard problem.
+    - **In a DAG:** Both are solvable in **O(V+E)** using topological sorting! It's enough to process vertices in topological order and update distances to neighbors using the standard relaxation rule.
+    - _Application:_ The critical path in project management (PERT) is precisely the longest path in a DAG of tasks.
+3.  **The Closure Problem:** Given vertex weights (can be negative). Find a subset of vertices C with **maximum total weight**, such that no edges leave C (a closure). Solved by reduction to the **maximum flow/minimum cut** problem.
+4.  **Construction from Cyclic Graphs:**
+    - **Condensation:** Any directed graph can be transformed into a DAG by **contracting its strongly connected components (SCCs)** into a single "supervertex." This is the basis of many algorithms (e.g., Kosaraju's algorithm).
+    - **Orientation as a DAG:** For an undirected graph, one can try to assign directions to edges to form a DAG (this is always possible — simply order the vertices). The number of such **acyclic orientations** equals the value of the graph's **chromatic polynomial** at point (-1).
+
+---
+
+### IV. DAG Applications (Where is all this used?)
+
+1.  **Build Systems and Task Scheduling:**
+    - **Make, CMake, Gradle, etc.:** Build files describe dependencies between modules. The DAG guarantees that each module is compiled after all its dependencies.
+    - **Task Schedulers (Airflow, Luigi, Prefect):** Modern data orchestration tools represent workflows precisely as DAGs. This allows for visualization, parallelization, and task restarting.
+
+2.  **Distributed Systems and Cryptocurrencies:**
+    - **Version Control Systems (Git):** Commit history is a DAG (due to branch merges), not a tree.
+    - **Non-Chain-Based Blockchain:** IOTA, Hedera Hashgraph use a DAG structure (Tangle) for transaction confirmation, where each new transaction confirms several previous ones. This is an alternative to a linear blockchain.
+
+3.  **Data Processing and Parallel Computing:**
+    - **Dataflow Programming (Apache Spark, TensorFlow):** Computations are represented as a graph of operations on data. The DAG allows optimization of execution order, identification of independent branches for parallelism, and avoidance of repeated computations (memoization).
+
+4.  **Causal Models and Probabilistic Graphs:**
+    - **Bayesian Networks:** A classic example of a DAG. Vertices are random variables, edges are causal links or direct influences. Acyclicity is critical for correct computation of joint probabilities.
+    - **Structural Causal Models:** The foundation of modern causal inference. The DAG encodes assumptions about the absence of hidden common causes for certain variables (the marginality assumption).
+
+5.  **Compilers and Static Analysis:**
+    - **Control Flow Graph (CFG)** _is usually cyclic_ (due to loops in code). But many analyses (e.g., constant propagation) work on its **dominance tree**, which is a DAG.
+    - **Data Dependency Graph (DDG):** Shows which computations depend on which others. A pure DAG, used for vectorization and instruction scheduling.
+
+6.  **Data Compression and Efficient Data Structures:**
+    - **Compressed Dictionaries (DAWG, CDAWG):** Used for efficient storage of string sets (e.g., all words in a dictionary) with shared **prefixes and suffixes**, saving memory compared to a trie.
+    - **Binary Decision Diagrams (BDD):** A canonical representation of Boolean functions as a DAG. The basis for efficient digital circuit and model verification.
+
+### Conclusion
+
+A DAG is not just an abstract mathematical structure, but a **fundamental language** for describing relations of order, dependency, and causality in computer science, engineering, and data science. Its magic lies in the combination of expressiveness (it can model complex dependencies) and computational "friendliness" (the existence of a topological sort opens the door to efficient algorithms).
+
+Understanding DAGs allows one to see commonality in seemingly different things: from building software to drawing conclusions about cause-and-effect in epidemiology. It is a concept well worth mastering.
