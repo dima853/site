@@ -53,19 +53,19 @@ If the administrator strictly prohibits creating shortcuts, links, and mount poi
 
 **\*explanation of notations at the end**
 
-Let \( G = (V, E) \) be a **directed graph**.
+Let \\( G = (V, E) \\) be a **directed graph**.
 
-\( G \) is called an **arborescence (oriented tree) with root \( r \in V \)** if the following conditions are met:
+\\( G \\) is called an **arborescence (oriented tree) with root \\( r \\in V \\)** if the following conditions are met:
 
-1.  **Existence of a root:** There exists exactly one vertex \( r \) into which **no edge enters** (i.e., its **indegree** \( \deg⁻(r) = 0 \)). This vertex is called the root.
-2.  **Uniqueness of the path from the root:** For any other vertex \( v \in V \setminus \{r\} \), there exists **exactly one** directed path from \( r \) to \( v \).
-3.  **Absence of cycles:** The graph \( G \) contains no directed cycles.
+1.  **Existence of a root:** There exists exactly one vertex \\( r \\) into which **no edge enters** (i.e., its **indegree** \\( \\deg⁻(r) = 0 \\)). This vertex is called the root.
+2.  **Uniqueness of the path from the root:** For any other vertex \\( v \\in V \\setminus \\{r\\} \\), there exists **exactly one** directed path from \\( r \\) to \\( v \\).
+3.  **Absence of cycles:** The graph \\( G \\) contains no directed cycles.
 
 ### **1.3. Key Corollaries and Properties:**
 
 Important and equivalent characteristics follow from the definition:
 
-- **Structure of incoming edges:** For each vertex \( v \neq r \), the **indegree is 1** (\( deg⁻(v) = 1 \)). For the root \( r \), it is 0.
+- **Structure of incoming edges:** For each vertex \\( v \\neq r \\), the **indegree is 1** (\\( deg⁻(v) = 1 \\)). For the root \\( r \\), it is 0.
 
 > 1. **The root is also a vertex.**  
 >    In graph theory, the terms "vertex" and "node" mean the same thing. The root is simply a special, designated vertex.
@@ -82,9 +82,9 @@ Important and equivalent characteristics follow from the definition:
 > Thus, the structure of incoming edges in an arborescence is strictly defined:  
 > **0 → for the root, 1 → for all other vertices.**
 
-- **Connectivity (in the directed sense):** The graph is **weakly connected** (if edge directions are ignored, it is connected) and **reachable from the root** (any vertex \( v \) can be reached from \( r \)).
-- **Number of edges:** If an arborescence has \( n \) vertices, then it has exactly \( n-1 \) edges.
-- **Orientation from ancestor to descendant:** For any edge \( (u, v) \), vertex \( u \) is an **ancestor** of vertex \( v \), and \( v \) is a **descendant** of \( u \). The root is an ancestor of all vertices.
+- **Connectivity (in the directed sense):** The graph is **weakly connected** (if edge directions are ignored, it is connected) and **reachable from the root** (any vertex \\( v \\) can be reached from \\( r \\)).
+- **Number of edges:** If an arborescence has \\( n \\) vertices, then it has exactly \\( n-1 \\) edges.
+- **Orientation from ancestor to descendant:** For any edge \\( (u, v) \\), vertex \\( u \\) is an **ancestor** of vertex \\( v \\), and \\( v \\) is a **descendant** of \\( u \\). The root is an ancestor of all vertices.
 - **Equivalence to a tree:** If directed edges are replaced with undirected ones, the result is an ordinary connected acyclic undirected tree.
 
 ---
@@ -99,17 +99,17 @@ A DAG is a directed graph without cycles. Examples: task dependency (makefile), 
 
 ### **2.2. Definition of Arborescence in a DAG:**
 
-Let \( G = (V, E) \) be a DAG. An **arborescence in a DAG** (often called a _directed spanning tree_) is a subgraph \( T = (V, E\*T) \), where \( E_T \subseteq E \), which itself is an arborescence (in the sense of Part 1) with some root \( r \in V \).
-**\_Spanning** is the key **word**, meaning **"covering all vertices"**.
+Let \\( G = (V, E) \\) be a DAG. An **arborescence in a DAG** (often called a _directed spanning tree_) is a subgraph \\( T = (V, E\\\*T) \\), where \\( E_T \\subseteq E \\), which itself is an arborescence (in the sense of Part 1) with some root \\( r \\in V \\).
+**\\\_Spanning** is the key **word**, meaning **"covering all vertices"**.
 
-**Key point:** All edges of the arborescence \( T \) are taken **from the original DAG \( G \)** and retain their orientation. The arborescence "fits" into the **_topological order_** of the DAG.
+**Key point:** All edges of the arborescence \\( T \\) are taken **from the original DAG \\( G \\)** and retain their orientation. The arborescence "fits" into the **\\\_topological order** of the DAG.
 
-**_Topological order (or topological sorting)_** is a way to linearly order the vertices of a directed graph such that for any edge from vertex A to vertex B, vertex A always comes before vertex B in the list.
+**\\\_Topological order (or topological sorting)** is a way to linearly order the vertices of a directed graph such that for any edge from vertex A to vertex B, vertex A always comes before vertex B in the list.
 
 - **Main condition:** Works only in graphs without cycles (DAG). If it's possible to return from the end to the beginning, the order cannot be constructed.
-- **Essence:** If there is a path from \(A\) to \(B\), then in the list \(A\) will always be to the left of \(B\). This is a "timeline" or task execution queue.
-- **Reachability vs. Order:** If \(A\rightarrow B\), then \(A\) comes before \(B\) (always).  
-  If \(A\) comes before \(B\) in the list, this does not mean there is a path between them (they might simply be independent parallel tasks).  
+- **Essence:** If there is a path from \\(A\\) to \\(B\\), then in the list \\(A\\) will always be to the left of \\(B\\). This is a "timeline" or task execution queue.
+- **Reachability vs. Order:** If \\(A\\rightarrow B\\), then \\(A\\) comes before \\(B\\) (always).  
+  If \\(A\\) comes before \\(B\\) in the list, this does not mean there is a path between them (they might simply be independent parallel tasks).  
   **Remember:** Topological order is a to-do list where you will never encounter a situation where to perform the current step you need to do something that comes later in the list. (There are no cycles).
 
 ### **2.3. Existence and Construction:**
@@ -118,25 +118,25 @@ In an arbitrary DAG, an arborescence covering **all** vertices (i.e., a _spannin
 
 **Necessary conditions for the existence of a spanning arborescence in a DAG:**
 
-1.  **Existence of a unique root-source:** The DAG must have **exactly one** node with zero indegree (a source). This node becomes a candidate for the root \( r \) of the arborescence. If there are several such nodes, constructing a single spanning tree is impossible (several disconnected trees will result).
-2.  **Reachability from the root:** This unique source \( r \) must be reachable **from all other vertices** of the DAG. This condition does not automatically follow from the first — there can be components isolated from \( r \) in the DAG, even if \( r \) is the only source in the entire graph.
+1.  **Existence of a unique root-source:** The DAG must have **exactly one** node with zero indegree (a source). This node becomes a candidate for the root \\( r \\) of the arborescence. If there are several such nodes, constructing a single spanning tree is impossible (several disconnected trees will result).
+2.  **Reachability from the root:** This unique source \\( r \\) must be reachable **from all other vertices** of the DAG. This condition does not automatically follow from the first — there can be components isolated from \\( r \\) in the DAG, even if \\( r \\) is the only source in the entire graph.
 
 **Important note:** Even if both conditions are met, **not any** choice of one incoming edge for each vertex will lead to a connected arborescence. A poor choice may create a forest (several trees) or violate reachability from the root.
 
 **Correct construction algorithm (traversal from the root):**
-If the conditions are met, a spanning arborescence can be guaranteed by traversal (BFS/DFS) starting from the root \( r \) and selecting _parent_ edges.
+If the conditions are met, a spanning arborescence can be guaranteed by traversal (BFS/DFS) starting from the root \\( r \\) and selecting _parent_ edges.
 
-- Initialize an empty subgraph \( T \).
-- Select the unique source \( r \) as the root and add it to \( T \).
-- Start a traversal (e.g., BFS) from \( r \) along the edges of the original DAG \( G \).
-- For each new vertex \( v \) reached during traversal via edge \( (u, v) \in E \), add this edge \( (u, v) \) to \( T \) as the sole incoming edge for \( v \) in the arborescence.
-- After traversal is complete, check that \( T \) contains all vertices \( V \). If yes, then \( T \) is the desired spanning arborescence. If some vertices were not reached, then despite the conditions being met, the choice of edges during traversal might have led to a dead end; in this case, a more complex algorithm for finding a **_spanning arborescence_** is required.
+- Initialize an empty subgraph \\( T \\).
+- Select the unique source \\( r \\) as the root and add it to \\( T \\).
+- Start a traversal (e.g., BFS) from \\( r \\) along the edges of the original DAG \\( G \\).
+- For each new vertex \\( v \\) reached during traversal via edge \\( (u, v) \\in E \\), add this edge \\( (u, v) \\) to \\( T \\) as the sole incoming edge for \\( v \\) in the arborescence.
+- After traversal is complete, check that \\( T \\) contains all vertices \\( V \\). If yes, then \\( T \\) is the desired spanning arborescence. If some vertices were not reached, then despite the conditions being met, the choice of edges during traversal might have led to a dead end; in this case, a more complex algorithm for finding a **\\\_spanning arborescence** is required.
 
 **Alternative approach (parent selection):**
 A simpler-to-implement method that **guarantees** the construction of an arborescence if it exists:
 
-1.  Perform a topological sort of the DAG \( G \).
-2.  For each vertex \( v \neq r \) (in topological order), choose as its _parent_ any vertex \( u \) for which there exists an edge \( (u, v) \in E \). Thanks to the topological order, \( u \) will be processed before \( v \), which guarantees the absence of cycles and reachability from the root (provided the root \( r \) is the first vertex in the order). All selected edges \( (u, v) \) form the desired arborescence \( T \).
+1.  Perform a topological sort of the DAG \\( G \\).
+2.  For each vertex \\( v \\neq r \\) (in topological order), choose as its _parent_ any vertex \\( u \\) for which there exists an edge \\( (u, v) \\in E \\). Thanks to the topological order, \\( u \\) will be processed before \\( v \\), which guarantees the absence of cycles and reachability from the root (provided the root \\( r \\) is the first vertex in the order). All selected edges \\( (u, v) \\) form the desired arborescence \\( T \\).
 
 > By definition, every arborescence is a DAG (directed acyclic graph).
 
@@ -144,13 +144,13 @@ A simpler-to-implement method that **guarantees** the construction of an arbores
 
 ### Part 3: Comparison and Summary Table
 
-| Property       | Arborescence (general)                            | Arborescence as a subgraph of a DAG                                                 | "Arborescence(Dag)" (as a property of a single graph)                   |
-| :------------- | :------------------------------------------------ | :---------------------------------------------------------------------------------- | :---------------------------------------------------------------------- |
-| **Base Graph** | It is a tree by itself.                           | It is a **subgraph** of a larger DAG.                                               | The single graph considered possesses two properties.                   |
-| **Root**       | One, with `deg⁻ = 0`.                             | The root is the unique source in the DAG (if it's a spanning tree).                 | One, with `deg⁻ = 0`.                                                   |
-| **Indegree**   | `deg⁻(v) = 1` for all `v ≠ r`.                    | `deg⁻_T(v) = 1` in subgraph \( T \), but in the original DAG `deg⁻_G(v)` can be >1. | `deg⁻(v) = 1` for all `v ≠ r`.                                          |
-| **Cycles**     | No directed cycles (follows from the definition). | None (in both \( T \) and \( G \)).                                                 | None (follows from both properties).                                    |
-| **Main Idea**  | Oriented tree-like hierarchy.                     | Extracting a tree-like hierarchy from a dependency graph.                           | Emphasizes that the graph is a strict hierarchical tree without cycles. |
+| Property       | Arborescence (general)                            | Arborescence as a subgraph of a DAG                                                   | "Arborescence(Dag)" (as a property of a single graph)                   |
+| :------------- | :------------------------------------------------ | :------------------------------------------------------------------------------------ | :---------------------------------------------------------------------- |
+| **Base Graph** | It is a tree by itself.                           | It is a **subgraph** of a larger DAG.                                                 | The single graph considered possesses two properties.                   |
+| **Root**       | One, with `deg⁻ = 0`.                             | The root is the unique source in the DAG (if it's a spanning tree).                   | One, with `deg⁻ = 0`.                                                   |
+| **Indegree**   | `deg⁻(v) = 1` for all `v ≠ r`.                    | `deg⁻_T(v) = 1` in subgraph \\( T \\), but in the original DAG `deg⁻_G(v)` can be >1. | `deg⁻(v) = 1` for all `v ≠ r`.                                          |
+| **Cycles**     | No directed cycles (follows from the definition). | None (in both \\( T \\) and \\( G \\)).                                               | None (follows from both properties).                                    |
+| **Main Idea**  | Oriented tree-like hierarchy.                     | Extracting a tree-like hierarchy from a dependency graph.                             | Emphasizes that the graph is a strict hierarchical tree without cycles. |
 
 ### Example for DAG (constructing an arborescence):
 
@@ -202,7 +202,7 @@ We get the arborescence: `A -> B, A -> C, B -> D, C -> E`. It covers all vertice
 ### 2. `deg⁻(r) = 0`
 
 - `deg⁻(v)` — the **indegree** of a vertex (number of edges entering the vertex)
-  - Often denoted as \(deg^{-}(v)\) or \(d\_{in}(v)\).
+  - Often denoted as \\(deg^{-}(v)\\) or \\(d\\\_{in}(v)\\).
 - `(r)` — for vertex `r`
 - `= 0` — equals zero
 - **Complete meaning:** no edge **enters** the root (there is no arrow pointing to this vertex)
@@ -241,12 +241,12 @@ We get the arborescence: `A -> B, A -> C, B -> D, C -> E`. It covers all vertice
 **The meaning of the task is extremely simple:**  
 Check if there are cycles in the list of dependencies.
 
-- **If there are no cycles:** You can create a study plan and complete all courses \(\rightarrow \) **true**.
-- **If there is a cycle:** (for example, course 0 requires course 1, and course 1 requires course 0), you fall into a "vicious circle" and cannot even start \(\rightarrow \) **false**.
+- **If there are no cycles:** You can create a study plan and complete all courses \\(\\rightarrow \\) **true**.
+- **If there is a cycle:** (for example, course 0 requires course 1, and course 1 requires course 0), you fall into a "vicious circle" and cannot even start \\(\\rightarrow \\) **false**.
 
 > Visually:  
-> `[[1,0]]` — this is a straight line (\(0\rightarrow 1\)). All good.  
-> `[[1,0],[0,1]]` — this is a ring (\(0\leftrightarrow 1\)). Deadlock.
+> `[[1,0]]` — this is a straight line (\\(0\\rightarrow 1\\)). All good.  
+> `[[1,0],[0,1]]` — this is a ring (\\(0\\leftrightarrow 1\\)). Deadlock.
 
 ```java
 class Solution {
