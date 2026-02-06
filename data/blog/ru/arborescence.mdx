@@ -251,32 +251,41 @@ DAG — это ориентированный граф без циклов. Пр
 class Solution {
     public boolean canFinish(int num_courses, int[][] prerequisites) {
         // 1. ПОДГОТОВКА СТРУКТУРЫ ГРАФА
+        // Создаем список смежности (adj), где индекс — это курс,
+        // а список внутри — это те курсы, которые станут доступны после него.
         List<List<Integer>> adj = new ArrayList<>();
         for (int i = 0; i < num_courses; i++) adj.add(new ArrayList<>());
 
         // 2. ЗАПОЛНЕНИЕ ГРАФА И СЧЕТЧИКА "ДОЛГОВ"
+        // indegree[i] — это количество курсов-пререквизитов, которые нужно сдать ДО курса i.
         int[] indegree = new int[num_courses];
         for (int[] pair : prerequisites) {
             int course = pair[0]; // Целевой курс
             int pre = pair[1];    // Курс-условие
-            adj.get(pre).add(course);
-            indegree[course]++;
+            adj.get(pre).add(course); // Проводим стрелку: pre -> course
+            indegree[course]++;       // Увеличиваем счетчик "входящих" стрелок для цели
         }
 
         // 3. ПОИСК СТАРТОВЫХ ТОЧЕК
+        // Очередь q хранит курсы, у которых НЕТ пререквизитов (их можно учить прямо сейчас).
         Queue<Integer> q = new LinkedList<>();
         for (int i = 0; i < num_courses; i++) {
+            // Если долгов (indegree) нет, добавляем в очередь на прохождение
             if (indegree[i] == 0) q.offer(i);
         }
 
         // 4. ПРОЦЕСС "ОБУЧЕНИЯ" (Обход)
-        int visited_count = 0;
+        int visited_count = 0; // Считаем, сколько курсов мы реально смогли пройти
         while (!q.isEmpty()) {
-            int curr = q.poll();
-            visited_count++;
+            int curr = q.poll(); // Берем доступный курс из очереди
+            visited_count++;     // "Проходим" его и увеличиваем счетчик
 
+            // Смотрим на все курсы, которые зависели от только что пройденного (curr)
             for (int neighbor : adj.get(curr)) {
-                indegree[neighbor]--;
+                indegree[neighbor]--; // Уменьшаем их счетчик долгов на 1
+
+                // Если после уменьшения долгов стало 0 — значит, все условия для
+                // этого курса выполнены, его можно учить. Добавляем в очередь.
                 if (indegree[neighbor] == 0) {
                     q.offer(neighbor);
                 }
@@ -284,7 +293,10 @@ class Solution {
         }
 
         // 5. ПРОВЕРКА НА ЦИКЛЫ
+        // Если visited_count равен общему числу курсов, значит мы прошли всё.
+        // Если меньше — значит часть курсов "зависла" в цикле и мы до них не добрались.
         return visited_count == num_courses;
     }
 }
+
 ```

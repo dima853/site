@@ -251,41 +251,53 @@ Check if there are cycles in the list of dependencies.
 ```java
 class Solution {
     public boolean canFinish(int num_courses, int[][] prerequisites) {
-        // 1. PREPARING THE GRAPH STRUCTURE
+        // 1. BUILD THE GRAPH STRUCTURE
+        // Create an adjacency list where each index represents a course,
+        // and the inner list contains courses that depend on it.
         List<List<Integer>> adj = new ArrayList<>();
         for (int i = 0; i < num_courses; i++) adj.add(new ArrayList<>());
 
-        // 2. FILLING THE GRAPH AND THE "DEBT" COUNTER
+        // 2. FILL THE ADJACENCY LIST AND COUNTER "INDEGREE"
+        // indegree[i] stores the number of prerequisites required before taking course i.
         int[] indegree = new int[num_courses];
         for (int[] pair : prerequisites) {
-            int course = pair[0];
-            int pre = pair[1];
-            adj.get(pre).add(course);
-            indegree[course]++;
+            int course = pair[0]; // The dependent course
+            int pre = pair[1];    // The prerequisite course
+            adj.get(pre).add(course); // Directed edge: pre -> course
+            indegree[course]++;       // Increment the number of incoming edges for the target
         }
 
-        // 3. FINDING STARTING POINTS
+        // 3. INITIALIZE STARTING POINTS
+        // The queue 'q' will store courses with NO prerequisites (indegree == 0).
         Queue<Integer> q = new LinkedList<>();
         for (int i = 0; i < num_courses; i++) {
+            // If a course has no dependencies, it can be taken immediately.
             if (indegree[i] == 0) q.offer(i);
         }
 
-        // 4. THE "LEARNING" PROCESS (Traversal)
-        int visited_count = 0;
+        // 4. PROCESS THE COURSES (Kahn's Algorithm / BFS)
+        int visited_count = 0; // Track how many courses we successfully completed
         while (!q.isEmpty()) {
-            int curr = q.poll();
-            visited_count++;
+            int curr = q.poll(); // Take a course from the queue
+            visited_count++;     // Mark it as "taken"
 
+            // Look at all courses that depend on the current finished course
             for (int neighbor : adj.get(curr)) {
-                indegree[neighbor]--;
+                indegree[neighbor]--; // "Remove" the dependency (decrement indegree)
+
+                // If all prerequisites are met (indegree is 0),
+                // the neighbor course becomes available to take.
                 if (indegree[neighbor] == 0) {
                     q.offer(neighbor);
                 }
             }
         }
 
-        // 5. CYCLE CHECK
+        // 5. FINAL CYCLE CHECK
+        // If visited_count equals num_courses, it means we found a valid linear order (no cycles).
+        // If not, there is at least one cycle (deadlock) in the graph.
         return visited_count == num_courses;
     }
 }
+
 ```
