@@ -99,8 +99,8 @@ A DAG is a directed graph without cycles. Examples: task dependency (makefile), 
 
 ### **2.2. Definition of Arborescence in a DAG:**
 
-Let \( G = (V, E) \) be a DAG. An **arborescence in a DAG** (often called a _directed spanning tree_) is a subgraph \( T = (V, E_T) \), where \( E_T \subseteq E \), which itself is an arborescence (in the sense of Part 1) with some root \( r \in V \).
-**_Spanning_** is the key **word**, meaning **"covering all vertices"**.
+Let \( G = (V, E) \) be a DAG. An **arborescence in a DAG** (often called a _directed spanning tree_) is a subgraph \( T = (V, E*T) \), where \( E_T \subseteq E \), which itself is an arborescence (in the sense of Part 1) with some root \( r \in V \).
+\*\*\_Spanning*** is the key **word**, meaning **"covering all vertices"\*\*.
 
 **Key point:** All edges of the arborescence \( T \) are taken **from the original DAG \( G \)** and retain their orientation. The arborescence "fits" into the **_topological order_** of the DAG.
 
@@ -130,7 +130,7 @@ If the conditions are met, a spanning arborescence can be guaranteed by traversa
 - Select the unique source \( r \) as the root and add it to \( T \).
 - Start a traversal (e.g., BFS) from \( r \) along the edges of the original DAG \( G \).
 - For each new vertex \( v \) reached during traversal via edge \( (u, v) \in E \), add this edge \( (u, v) \) to \( T \) as the sole incoming edge for \( v \) in the arborescence.
-- After traversal is complete, check that \( T \) contains all vertices \( V \). If yes, then \( T \) is the desired spanning arborescence. If some vertices were not reached, then despite the conditions being met, the choice of edges during traversal might have led to a dead end; in this case, a more complex algorithm for finding a _spanning arborescence_ is required.
+- After traversal is complete, check that \( T \) contains all vertices \( V \). If yes, then \( T \) is the desired spanning arborescence. If some vertices were not reached, then despite the conditions being met, the choice of edges during traversal might have led to a dead end; in this case, a more complex algorithm for finding a **_spanning arborescence_** is required.
 
 **Alternative approach (parent selection):**
 A simpler-to-implement method that **guarantees** the construction of an arborescence if it exists:
