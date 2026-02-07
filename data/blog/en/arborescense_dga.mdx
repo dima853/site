@@ -21,3 +21,27 @@ Imagine an ordinary undirected tree. Now assign a special role to one of its ver
 - All folders are created via "New Folder"; there are no shortcuts or links.
 - Each folder has **exactly one "parent"** (the folder it resides in).
 - You can only go up to the parent. This is a classic **tree (arborescence)**.
+
+---
+
+### DAG with Potential Arborescence (real system with `mklink` or `.lnk`):
+
+Let's say there is a structure:
+
+```
+C:\Projects\
+├── SecretData\
+└── CurrentProject\   <-- contains shortcut "Data" → C:\Projects\SecretData
+```
+
+Now this is a **DAG**, but **not an arborescence**, because:
+
+- `SecretData` has **two "parents"**:
+  1.  Direct: `C:\Projects\`
+  2.  Via the shortcut: `C:\Projects\CurrentProject\Data\`
+- The condition `indegree = 1` for an arborescence is violated.
+- But there are no cycles — it is a DAG.
+
+### "Arborescence(DAG)" in this analogy:
+
+If the administrator strictly prohibits creating shortcuts, links, and mount points, then the file system **is both a DAG (no cycles) and an Arborescence (a tree)**. This is precisely that simple case of a "simple folder tree".
