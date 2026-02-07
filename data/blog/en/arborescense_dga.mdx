@@ -45,3 +45,19 @@ Now this is a **DAG**, but **not an arborescence**, because:
 ### "Arborescence(DAG)" in this analogy:
 
 If the administrator strictly prohibits creating shortcuts, links, and mount points, then the file system **is both a DAG (no cycles) and an Arborescence (a tree)**. This is precisely that simple case of a "simple folder tree".
+
+---
+
+### **1.2. Formal Definition:**
+
+**explanation of notations at the end**
+
+Let G = (V, E) be a **directed graph**.
+
+G is called an **arborescence (oriented tree) with root r ∈ V** if the following conditions are met:
+
+1.  **Existence of a root:** There exists exactly one vertex r into which **no edge enters** (i.e., its **indegree** deg⁻(r) = 0). This vertex is called the root.
+2.  **Uniqueness of the path from the root:** For any other vertex v ∈ V \ {r}, there exists **exactly one** directed path from r to v.
+3.  **Absence of cycles:** The graph G contains no directed cycles.
+
+### **1.3. Key Corollaries and Properties:**
