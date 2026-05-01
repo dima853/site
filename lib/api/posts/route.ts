@@ -19,7 +19,7 @@ export async function GET() {
 
   return NextResponse.json(posts, {
     headers: {
-      'Access-Control-Allow-Origin': '*',  // разрешаем запросы с kryosette
+      'Access-Control-Allow-Origin': '*', // разрешаем запросы с kryosette
       'Cache-Control': 's-maxage=3600, stale-while-revalidate',
     },
   })

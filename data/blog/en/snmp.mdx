@@ -3,12 +3,11 @@ title: 'SNMP Guide: What, Why, and How? '
 date: '2024-01-15'
 
 summary: ''
-draft: false  # если true - пост не будет опубликован
-authors: ['default']  # автор из data/authors/
-layout: PostLayout  # макет поста
-images: ['/static/images/my-image.jpg']  # опционально: изображения
+draft: false # если true - пост не будет опубликован
+authors: ['default'] # автор из data/authors/
+layout: PostLayout # макет поста
+images: ['/static/images/my-image.jpg'] # опционально: изображения
 ---
-
 
 ## 🌐 **What SNMP Actually Does:**
 
@@ -19,11 +18,12 @@ Think of it like this:
 ```
 You (Manager) --WhatsApp--> Friend (Network Device)
 "Hey, what's your status?" = GET request
-"BRB, battery 5%" = TRAP notification  
+"BRB, battery 5%" = TRAP notification
 "Change your profile pic" = SET request
 ```
 
 **Real World Examples:**
+
 - 📱 **Your phone** monitoring Wi-Fi router signal strength
 - 🖥️ **IT department** checking if servers are alive
 - 🚨 **Data center** getting alerts when temperature spikes
@@ -31,21 +31,24 @@ You (Manager) --WhatsApp--> Friend (Network Device)
 
 ---
 
-## 🔗 **SNMP + MIB + LLDP = The Dream Team** 
+## 🔗 **SNMP + MIB + LLDP = The Dream Team**
 
 You're absolutely right! Here's how they work together:
 
 ### **SNMP 🕵️‍♂️ - The Detective**
-- **Asks questions**: "What's your CPU usage?" 
+
+- **Asks questions**: "What's your CPU usage?"
 - **Gives commands**: "Shut down port 5!"
 - **Listens for gossip**: "Hey, I just crashed!"
 
-### **MIB 📚 - The Phone Book** 
+### **MIB 📚 - The Phone Book**
+
 - **Contains all "questions" you can ask**
 - **Every device has its own phone book**
 - **Standardized "contact list" for all vendors**
 
 ### **LLDP 📢 - The Town Crier**
+
 - **Shouts**: "I'm Router-X, connected to Switch-Y!"
 - **Like WhatsApp status**: "Here's who I am and who I know"
 - **SNMP reads LLDP info** to map network topology
@@ -56,7 +59,7 @@ You're absolutely right! Here's how they work together:
 
 ```
 SNMP Manager = You texting friends
-SNMP Agent = Your friends' phones  
+SNMP Agent = Your friends' phones
 MIB = Your contacts list 📞
 OID = Phone numbers 📱
 GET = "What's up?" ❓
@@ -70,13 +73,15 @@ LLDP = "I'm at Starbucks with Bob" 📍
 ## 🚀 **Why You Should Care:**
 
 **Without SNMP:**
+
 - 🕵️‍♂️ **Manual checking** of every device
 - 😴 **No alerts** when things break
 - 🤷 **No historical data** for troubleshooting
 
 **With SNMP:**
+
 - 📊 **Dashboard** showing everything
-- 📱 **Phone alerts** when problems occur  
+- 📱 **Phone alerts** when problems occur
 - 📈 **Trend analysis** to predict issues
 - 🤖 **Automated responses** to common problems
 
@@ -84,10 +89,10 @@ LLDP = "I'm at Starbucks with Bob" 📍
 
 ## 💡 **TL;DR:**
 
-**SNMP lets you remotely monitor and control network devices like you're texting friends on WhatsApp!** 
+**SNMP lets you remotely monitor and control network devices like you're texting friends on WhatsApp!**
 
 - **Manager** = You texting
-- **Agent** = Your friends  
+- **Agent** = Your friends
 - **MIB** = Contacts list
 - **OID** = Phone numbers
 - **LLDP** = Location sharing
@@ -120,15 +125,15 @@ The combination of `#pragma once` and the classic `#ifndef` provides a balanced 
 ### Why this approach is commonly recommended:
 
 1. **`#pragma once` - Potential speed and convenience**
-    * **May be faster in some scenarios**: On projects with complex include hierarchies, some compilers can optimize file processing using filesystem metadata.
-    * **Convenience factor**: Avoids the need to maintain unique macro names across the codebase.
-    * **Reduced naming conflicts**: Eliminates potential macro name collisions between different headers.
+   - **May be faster in some scenarios**: On projects with complex include hierarchies, some compilers can optimize file processing using filesystem metadata.
+   - **Convenience factor**: Avoids the need to maintain unique macro names across the codebase.
+   - **Reduced naming conflicts**: Eliminates potential macro name collisions between different headers.
 
 2. **`#ifndef` / `#define` - Portability and reliability**
-    * **Wide portability**: The `#ifndef` directive is a C/C++ language standard that should work on any compliant compiler.
-    * **Fallback protection**: Provides a reliable alternative when `#pragma once` support is limited or encounters unusual filesystem situations.
-# but macros are not safe.
+   - **Wide portability**: The `#ifndef` directive is a C/C++ language standard that should work on any compliant compiler.
+   - **Fallback protection**: Provides a reliable alternative when `#pragma once` support is limited or encounters unusual filesystem situations.
 
+# but macros are not safe.
 
 ### Performance Observations from Testing:
 
@@ -142,9 +147,9 @@ Our limited testing showed mixed results that may not be representative of all s
 
 ### Practical Considerations:
 
-* **Modern compiler behavior**: Most contemporary compilers (GCC, Clang, MSVC) recognize `#pragma once` while maintaining `#ifndef` compatibility
-* **Compiler variations**: Some compilers may optimize the combined approach differently than others
-* **Edge case handling**: The dual approach may provide additional safety in unusual environments like network filesystems or with symbolic links
+- **Modern compiler behavior**: Most contemporary compilers (GCC, Clang, MSVC) recognize `#pragma once` while maintaining `#ifndef` compatibility
+- **Compiler variations**: Some compilers may optimize the combined approach differently than others
+- **Edge case handling**: The dual approach may provide additional safety in unusual environments like network filesystems or with symbolic links
 
 ### Conservative Recommendation:
 
@@ -155,6 +160,7 @@ The minimal overhead of including both directives appears to be acceptable for m
 # Implementation Details & Testing - https://github.com/dima853/self_university/tree/main/network/c/compatibility/ifndef_pragmaonce
 
 ---
+
 # SNMP Header Documentation (Modernized Version)
 
 ## 📋 Header Overview
@@ -178,13 +184,13 @@ The combination of `#pragma once` and the classic `#ifndef` provides a balanced 
 ### Why this approach is commonly recommended:
 
 1. **`#pragma once` - Potential speed and convenience**
-    * **May be faster in some scenarios**: On projects with complex include hierarchies, some compilers can optimize file processing using filesystem metadata.
-    * **Convenience factor**: Avoids the need to maintain unique macro names across the codebase.
-    * **Reduced naming conflicts**: Eliminates potential macro name collisions between different headers.
+   - **May be faster in some scenarios**: On projects with complex include hierarchies, some compilers can optimize file processing using filesystem metadata.
+   - **Convenience factor**: Avoids the need to maintain unique macro names across the codebase.
+   - **Reduced naming conflicts**: Eliminates potential macro name collisions between different headers.
 
 2. **`#ifndef` / `#define` - Portability and reliability**
-    * **Wide portability**: The `#ifndef` directive is a C/C++ language standard that should work on any compliant compiler.
-    * **Fallback protection**: Provides a reliable alternative when `#pragma once` support is limited or encounters unusual filesystem situations.
+   - **Wide portability**: The `#ifndef` directive is a C/C++ language standard that should work on any compliant compiler.
+   - **Fallback protection**: Provides a reliable alternative when `#pragma once` support is limited or encounters unusual filesystem situations.
 
 ### Performance Observations from Testing:
 
@@ -198,9 +204,9 @@ Our limited testing showed mixed results that may not be representative of all s
 
 ### Practical Considerations:
 
-* **Modern compiler behavior**: Most contemporary compilers (GCC, Clang, MSVC) recognize `#pragma once` while maintaining `#ifndef` compatibility
-* **Compiler variations**: Some compilers may optimize the combined approach differently than others
-* **Edge case handling**: The dual approach may provide additional safety in unusual environments like network filesystems or with symbolic links
+- **Modern compiler behavior**: Most contemporary compilers (GCC, Clang, MSVC) recognize `#pragma once` while maintaining `#ifndef` compatibility
+- **Compiler variations**: Some compilers may optimize the combined approach differently than others
+- **Edge case handling**: The dual approach may provide additional safety in unusual environments like network filesystems or with symbolic links
 
 ### Conservative Recommendation:
 
@@ -230,13 +236,15 @@ The minimal overhead of including both directives appears to be acceptable for m
 ## ✅ **OFFICIALLY CONFIRMED BY IANA:**
 
 **Service Name: [snmp (Port 161)](https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml?search=161)**
+
 ```
 Port Number: 161
-Transport Protocol: tcp, udp  
+Transport Protocol: tcp, udp
 Description: SNMP
 ```
 
-**Service Name: [snmptrap (Port 162)](https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml?search=162)** 
+**Service Name: [snmptrap (Port 162)](https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml?search=162)**
+
 ```
 Port Number: 162
 Transport Protocol: tcp, udp
@@ -251,6 +259,7 @@ Assignee: Marshall Rose
 #define SNMP_MIN_MSG_SIZE 484           // RFC 3416 minimum
 #define SNMP_MAX_PACKET_SIZE 0x7FFFFFFF // Maximum theoretical size
 ```
+
 But it's a shit code, here's the correct code.
 
 ```c
@@ -281,13 +290,17 @@ But it's a shit code, here's the correct code.
 ```
 
 # Cheat sheet: Macro vs Enum vs Constant
+
 IMPORTANT ! https://gist.github.com/dima853/73ba55e23210efe880349a99fb6b904c
+
 ## use it as a REMINDER, not as a guide!
+
 ---
 
 ## 1) 📄 From RFC 894 (IP over Ethernet):
 
 **Page 1:**
+
 > "The maximum length of an IP datagram sent over an Ethernet is 1500 octets."
 
 **This corresponds to:** `#define SNMP_MAX_MSG_SIZE 1500`
@@ -295,6 +308,7 @@ IMPORTANT ! https://gist.github.com/dima853/73ba55e23210efe880349a99fb6b904c
 ## 2) 📄 From RFC 3416 (SNMP Protocol Operations):
 
 **Section 4.2:**
+
 > "The maximum size of an SNMP message is limited to the minimum of: (a) 484 octets (b) the maximum message size that the destination can accept"
 
 **This corresponds to:** `#define SNMP_MIN_MSG_SIZE 484`
@@ -302,6 +316,7 @@ IMPORTANT ! https://gist.github.com/dima853/73ba55e23210efe880349a99fb6b904c
 ## 3) 📄 From RFC 3416 (SNMP Protocol Operations):
 
 **Page 9, section 4.1:**
+
 > "A compliant implementation must support as many variable bindings in a PDU or BulkPDU as fit into the overall maximum message size limit of the SNMP engine, but no more than 2147483647 variable bindings."
 
 **This corresponds to:** `#define SNMP_MAX_PACKET_SIZE 0x7FFFFFFF` = 2,147,483,647
@@ -324,6 +339,7 @@ IMPORTANT ! https://gist.github.com/dima853/73ba55e23210efe880349a99fb6b904c
 ## 📨 PDU Types - SNMP Protocol Data Units
 
 ### Modern Enum-Based Approach
+
 ```c
 // ==================== PDU Type Constants ====================
 typedef enum {
@@ -339,6 +355,7 @@ typedef enum {
 ```
 
 **ASN.1 Encoding Explanation:**
+
 - **Context-specific tags**: 0xA0-0xA8 range
 - **Constructed types**: All PDU types are constructed ASN.1 sequences
 - **PDU type identifier**: Lower nibble indicates specific PDU type
@@ -379,14 +396,16 @@ typedef enum {
 ```
 
 **SET Operation State Flow:**
+
 ```
 RESERVE1 → RESERVE2 → ACTION → COMMIT → FREE
                     ↘ UNDO (if error)
 ```
 
 **Advanced Internal States:**
+
 - **CHECK_VALUE**: Validate data before processing
-- **ROW_CREATE**: Dynamic row creation in tables  
+- **ROW_CREATE**: Dynamic row creation in tables
 - **UNDO_SETUP**: Prepare for potential rollback
 - **IRREVERSIBLE_COMMIT**: Changes cannot be rolled back
 
@@ -448,6 +467,7 @@ typedef enum {
 ## 🚨 Error Status Codes
 
 ### Modern Enum-Based Error Codes
+
 ```c
 // ==================== Error Codes ====================
 typedef enum {
@@ -466,6 +486,7 @@ typedef enum {
 ```
 
 ### Error Validation Function
+
 ```c
 // ==================== Error Validation ====================
 static inline SnmpErrorCode snmp_validate_error(int error_code) {
@@ -479,13 +500,15 @@ static inline SnmpErrorCode snmp_validate_error(int error_code) {
 ```
 
 **Key Error Explanations:**
+
 - `NO_ACCESS`: Authentication/authorization failure
-- `AUTHORIZATION`: VACM access control denial  
+- `AUTHORIZATION`: VACM access control denial
 - `INCONSISTENT_NAME`: Row creation semantic error
 
 **Purpose:** Sanitizes error codes to prevent invalid values.
 
 **Equivalent logic:**
+
 ```c
 SnmpErrorCode validate_snmp_error(int error_code) {
     if (error_code > MAX_SNMP_ERROR) {      // More than 18
@@ -518,6 +541,7 @@ typedef enum {
 **Purpose:** Implements **dynamic row creation/deletion** in SNMP tables.
 
 **Usage Flow:**
+
 ```mermaid
 graph LR
     A[createAndGo] --> B[active]
@@ -547,6 +571,7 @@ typedef enum {
 ## 🛡️ Security Definitions (SNMPv3)
 
 ### Modern Security Framework
+
 ```c
 // ==================== Security Framework ====================
 #define SNMP_MP_MODEL_SNMPv3 3
@@ -559,7 +584,7 @@ typedef enum {
 
 typedef enum {
     SNMP_SEC_LEVEL_NO_AUTH_NO_PRIV = 1,  // noAuthNoPriv
-    SNMP_SEC_LEVEL_AUTH_NO_PRIV = 2,     // authNoPriv  
+    SNMP_SEC_LEVEL_AUTH_NO_PRIV = 2,     // authNoPriv
     SNMP_SEC_LEVEL_AUTH_PRIV = 3         // authPriv
 } SnmpSecurityLevel;
 
@@ -571,11 +596,12 @@ typedef enum {
 ```
 
 **Security Combinations:**
+
 ```c
 // No security
 flags = 0
 
-// Authentication only  
+// Authentication only
 flags = SNMP_MSG_FLAG_AUTH
 
 // Authentication + Encryption
@@ -619,10 +645,11 @@ typedef enum {
 ```
 
 **OID Tree Structure:**
+
 ```
 1.3.6.1 (internet)
 ├── 2.1 (mib-2)
-├── 4.1 (enterprises) 
+├── 4.1 (enterprises)
 └── 6 (snmpV2)
     └── 3 (snmpModules)
 ```
@@ -632,6 +659,7 @@ typedef enum {
 ## 🔧 Function Prototypes
 
 ### Modern Function Declarations
+
 ```c
 // ==================== Function Declarations ====================
 // Utility functions
@@ -664,6 +692,7 @@ NETSNMP_IMPORT unsigned char* snmp_encode_variable(
 ---
 
 ## 🏁 Footer
+
 ```c
 #ifdef __cplusplus
 }
@@ -679,14 +708,15 @@ NETSNMP_IMPORT unsigned char* snmp_encode_variable(
 This modernized header provides:
 
 1. **Clean Protocol Constants** - Enum-based PDU types, error codes, ports
-2. **SNMPv3 Security** - Type-safe security models, levels, flags  
+2. **SNMPv3 Security** - Type-safe security models, levels, flags
 3. **Internal Processing** - State machines for SET operations with proper types
 4. **ASN.1 Utilities** - Encoding/decoding functions with clear parameter names
 5. **MIB Management** - Row status, storage types, OID bases using modern C practices
 
 **Key Improvements:**
+
 - ✅ Replaced magic numbers with typed enums
-- ✅ Replaced complex macros with inline functions  
+- ✅ Replaced complex macros with inline functions
 - ✅ Added proper parameter names to function declarations
 - ✅ Improved readability and type safety
 - ✅ Maintained backward compatibility with legacy macros
@@ -694,38 +724,53 @@ This modernized header provides:
 ---
 
 # How It Works? (Super Briefly)
-<img width="18804" height="2464" alt="Untitled diagram-2025-10-18-115602" src="https://github.com/user-attachments/assets/905f9d59-bed6-468b-ab1a-08045f185ea2" />
+
+<img
+  width="18804"
+  height="2464"
+  alt="Untitled diagram-2025-10-18-115602"
+  src="https://github.com/user-attachments/assets/905f9d59-bed6-468b-ab1a-08045f185ea2"
+/>
 
 ## 🛡️ **Security Levels (SNMPv3 Security Levels)**
 
 ### **L31: noAuthNoPriv (Level 1)**
+
 ```c
 #define SNMP_SEC_LEVEL_NOAUTH 1
 ```
+
 **What is it:** Without authentication and encryption  
-**How it works:** 
+**How it works:**
+
 - 🤡 Anonymous access
 - Messages are not subscribed
 - 🔓 Data is transmitted in clear text
 - 💀 **DANGEROUS!** Only for test networks
 
-### **L32: authNoPriv (Level 2)** 
+### **L32: authNoPriv (Level 2)**
+
 ```c
 #define SNMP_SEC_LEVEL_AUTHNOPRIV 2
 ```
+
 **What is it:** Authentication without encryption
 **How it works:**
+
 - ✅ User verification (login/password)
 - 🔐 HMAC-MD5 or HMAC-SHA for signature
 - 📨 Data is NOT encrypted
 - Protection against spoofing, but the data is visible
 
 ### **L33: authPriv (Level 3)**
+
 ```c
 #define SNMP_SEC_LEVEL_AUTHPRIV 3
 ```
+
 **What is it:** Authentication + Encryption
 **How it works:**
+
 - ✅ User verification
 - 🔐 Message signature
 - 🚫 Data encryption (DES, AES)
@@ -736,12 +781,14 @@ This modernized header provides:
 ## 📨 **PDU Types (Message Types)**
 
 ### **Core Operations**
+
 - **E11: GET (160)** - "Give the value of this variable"
 - **E12: GETNEXT (161)** - "Give the following variable in the MIB tree"
 - **E14: SET (163)** - "Change the value of a variable"
 - **E13: RESPONSE (162)** - "Reply to any request"
 
 ### **Advanced Operations**
+
 - **E21: GETBULK (165)** - "Give a lot of data at once" (optimization)
 - **E22: INFORM (166)** - "Confirmation Notification"
 - **E23: TRAPv2 (167)** - "Notification without confirmation"
@@ -759,6 +806,7 @@ BEGIN → RESERVE1 → RESERVE2 → ACTION → COMMIT → FREE
 ```
 
 **Why do I need to:**
+
 - `RESERVE1/RESERVE2` - booking resources
 - `ACTION` - making the change
 - `COMMIT` - confirm
@@ -770,8 +818,9 @@ BEGIN → RESERVE1 → RESERVE2 → ACTION → COMMIT → FREE
 ## ❌ **Exception Values**
 
 **When the variable is not found:**
+
 - **H1: noSuchObject (128)** - "There is no such object"
-- **H2: noSuchInstance (129)** - "There is no such instance"  
+- **H2: noSuchInstance (129)** - "There is no such instance"
 - **H3: endOfMibView (130)** - "There is nothing further in the tree"
 
 ---
@@ -779,6 +828,7 @@ BEGIN → RESERVE1 → RESERVE2 → ACTION → COMMIT → FREE
 ## 🚨 **Error Status Codes**
 
 ### **Basic Errors**
+
 - **I11: noError (0)** - Everything is ok
 - **I12: tooBig (1)** - The response is too big
 - **I13: noSuchName (2)** - Variable not found
@@ -787,6 +837,7 @@ BEGIN → RESERVE1 → RESERVE2 → ACTION → COMMIT → FREE
 - **I16: genErr(5)** - Common error
 
 ### **Extended Errors**
+
 - **I21: noAccess (6)** - No access rights
 - **I22: wrongType (7)** - Incorrect data type
 - **I23: wrongLength (8)** - Wrong length
@@ -797,6 +848,7 @@ BEGIN → RESERVE1 → RESERVE2 → ACTION → COMMIT → FREE
 ## 🗃️ **Row Status (Row statuses of tables)**
 
 **For dynamic table management:**
+
 ```c
 nonExistent → createAndWait → notInService → active → destroy
                createAndGo ────────────────┘
@@ -804,7 +856,7 @@ nonExistent → createAndWait → notInService → active → destroy
 
 - **J1: nonExistent** - The row does not exist
 - **J4/J5: createAndWait/createAndGo** - Create a string
-- **J3: notInService** - Created but not active  
+- **J3: notInService** - Created but not active
 - **J2: active** - Active and running
 - **J7: destroy** - Delete line
 
@@ -813,6 +865,7 @@ nonExistent → createAndWait → notInService → active → destroy
 ## 💾 **Storage Types**
 
 **How long does the data persist?:**
+
 - **K1: none** - Is not saved at all
 - **K3: volatile** - In memory only (disappears after reboot)
 - **K4: nonVolatile** - Persists between reboots
@@ -860,10 +913,11 @@ flowchart TD
 ```
 
 **Explanation:**
+
 - **SNMP Manager**: The controlling system that initiates requests and receives notifications
 - **SNMP Agent**: The managed device (router, switch, server) that responds to requests
 - **UDP 161**: Port for Manager → Agent communication (GET/SET requests)
-- **UDP 162**: Port for Agent → Manager communication (TRAP/INFORM notifications) 
+- **UDP 162**: Port for Agent → Manager communication (TRAP/INFORM notifications)
 - **MIB Database**: Management Information Base - the database of managed objects
 - **System Variables**: Device information like system description, uptime, contact info
 - **Network Interfaces**: Interface statistics, status, configuration
@@ -878,7 +932,7 @@ sequenceDiagram
     participant M as SNMP Manager
     participant A as SNMP Agent
     participant D as MIB Database
-    
+
     M->>A: GET 1.3.6.1.2.1.1.1.0
     A->>D: Lookup OID
     D->>A: Return: Linux Server 5.4.0
@@ -886,6 +940,7 @@ sequenceDiagram
 ```
 
 **Explanation:**
+
 - **SNMP Manager**: Sends a GET request for a specific OID
 - **GET 1.3.6.1.2.1.1.1.0**: Request for system description (sysDescr.0)
 - **SNMP Agent**: Receives request and processes it
@@ -904,26 +959,27 @@ flowchart TD
     A[SNMP PDUs] --> B[Request Types]
     A --> C[Response Types]
     A --> D[Notification Types]
-    
+
     B --> B1[GET<br/>Get specific variable]
     B --> B2[GETNEXT<br/>Get next variable]
     B --> B3[GETBULK<br/>Get multiple variables]
     B --> B4[SET<br/>Modify variable]
-    
+
     C --> C1[RESPONSE<br/>Reply to request]
-    
+
     D --> D1[TRAP<br/>Unsolicited notification]
     D --> D2[INFORM<br/>Acknowledged notification]
 ```
 
 **Explanation:**
+
 - **SNMP PDUs**: Protocol Data Units - the message types in SNMP
 - **Request Types**: Messages sent from Manager to Agent
   - **GET**: Retrieve a specific variable by OID
   - **GETNEXT**: Get the next variable in MIB tree (for walking tables)
   - **GETBULK**: Efficiently retrieve multiple rows from tables
   - **SET**: Modify or write a variable value
-- **Response Types**: 
+- **Response Types**:
   - **RESPONSE**: Reply to any request, contains results or errors
 - **Notification Types**: Unsolicited messages from Agent to Manager
   - **TRAP**: Unacknowledged notification (fire-and-forget)
@@ -938,13 +994,14 @@ flowchart TD
     A[SNMPv3 Security] --> B[noAuthNoPriv<br/>No security]
     A --> C[authNoPriv<br/>Authentication only]
     A --> D[authPriv<br/>Auth + Encryption]
-    
+
     B --> B1[No password<br/>Community string]
     C --> C1[HMAC-MD5/SHA<br/>Message integrity]
     D --> D1[DES/AES<br/>Data encryption]
 ```
 
 **Explanation:**
+
 - **SNMPv3 Security**: The security framework introduced in SNMP version 3
 - **noAuthNoPriv**: No authentication, no encryption (least secure)
   - **Community string**: Plain text password like "public" or "private"
@@ -961,6 +1018,7 @@ flowchart TD
 ## 🎯 **How does SNMP work in practice:**
 
 ### **Manager**
+
 ```bash
 # Device request
 snmpget -v 2c -c public 192.168.1.1 1.3.6.1.2.1.1.1.0
@@ -970,6 +1028,7 @@ SNMPv2-MIB::sysDescr.0 = STRING: Cisco IOS Software, Version 15.1
 ```
 
 **Explanation:**
+
 - **snmpget**: Command-line tool to send GET requests
 - **-v 2c**: SNMP version 2c (community-based security)
 - **-c public**: Community string "public" (like a password)
@@ -978,15 +1037,16 @@ SNMPv2-MIB::sysDescr.0 = STRING: Cisco IOS Software, Version 15.1
 - **Response format**: MIB::object = TYPE: value
 
 ### **Agent - Code**
+
 ```c
 // The pseudo-code of the SNMP agent
 while(1) {
 // Waiting for a request on port 161
     packet = recvfrom(udp_socket);
-    
+
     // Parsing the SNMP package
     pdu = parse_snmp_packet(packet);
-    
+
     // Processing the request
     switch(pdu->type) {
         case GET:
@@ -1002,6 +1062,7 @@ while(1) {
 ```
 
 **Explanation:**
+
 - **Infinite loop**: Agent continuously listens for requests
 - **recvfrom(udp_socket)**: Receives UDP packets on port 161
 - **parse_snmp_packet()**: Decodes SNMP message (ASN.1 BER encoding)
@@ -1011,6 +1072,7 @@ while(1) {
 - **send_response()**: Sends back the response to the manager
 
 ### **MIB Database**
+
 ```c
 // Example of MIB variables
 struct mib_entry {
@@ -1029,6 +1091,7 @@ struct mib_entry {
 ```
 
 **Explanation:**
+
 - **mib_entry**: Structure representing one managed object
 - **oid**: Object Identifier - unique address in the MIB tree
   - "1.3.6.1.2.1.1.1.0" = system.sysDescr.0 (system description)
@@ -1046,7 +1109,7 @@ struct mib_entry {
 ## 🔥 **Key points:**
 
 1. **Manager** - Initiates requests (GET, SET) and receives notifications
-2. **Agent** - Responds to requests, sends traps/informs  
+2. **Agent** - Responds to requests, sends traps/informs
 3. **MIB** - Database of managed variables with hierarchical OID structure
 4. **OID** - Unique addresses of variables in dotted decimal notation
 5. **PDUs** - Message Formats for different types of SNMP operations

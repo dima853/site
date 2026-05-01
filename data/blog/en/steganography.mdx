@@ -3,10 +3,10 @@ title: 'Steganography'
 date: '2024-01-15'
 
 summary: ''
-draft: false  # если true - пост не будет опубликован
-authors: ['default']  # автор из data/authors/
-layout: PostLayout  # макет поста
-images: ['/static/images/my-image.jpg']  # опционально: изображения
+draft: false # если true - пост не будет опубликован
+authors: ['default'] # автор из data/authors/
+layout: PostLayout # макет поста
+images: ['/static/images/my-image.jpg'] # опционально: изображения
 ---
 
 **Steganography** is the science and practice of **hiding the fact that information is being transmitted**, not the information itself (that's cryptography).
@@ -24,18 +24,19 @@ If cryptography is like sending a note in a safe that everyone sees but can't op
 The principle is always the same: hide a data container inside another, harmless carrier container without causing statistically significant anomalies.
 
 **1. In Images (Most Popular Method)**
-*   **Basic Method:** Replacing Least Significant Bits (LSB).
-*   **How it works:** Each pixel's color is encoded with numbers (e.g., in RGB). Changing the least significant bit alters the color by such a small amount that the human eye **won't notice**.
-*   **Example:** You want to hide the letter 'A' (ASCII code 65, which is `01000001` in binary) in 8 pixels. You replace the least significant bit of each pixel with one bit from the message.
-*   **Naive LSB replacement is a vulnerable and easily detectable method** through statistical analysis **(histogram analysis, Chi-square tests)**. Modern adaptive methods (e.g., syndrome coding, spreading across multiple bit planes) actively combat anomalies. Basic LSB is used only for Proof-of-Concept or against incompetent adversaries.
+
+- **Basic Method:** Replacing Least Significant Bits (LSB).
+- **How it works:** Each pixel's color is encoded with numbers (e.g., in RGB). Changing the least significant bit alters the color by such a small amount that the human eye **won't notice**.
+- **Example:** You want to hide the letter 'A' (ASCII code 65, which is `01000001` in binary) in 8 pixels. You replace the least significant bit of each pixel with one bit from the message.
+- **Naive LSB replacement is a vulnerable and easily detectable method** through statistical analysis **(histogram analysis, Chi-square tests)**. Modern adaptive methods (e.g., syndrome coding, spreading across multiple bit planes) actively combat anomalies. Basic LSB is used only for Proof-of-Concept or against incompetent adversaries.
 
 ### 1) **Histogram Analysis**
 
-*   **What it is:** A graphical representation of the distribution of values (e.g., pixel colors in an image).
-*   **Purpose in steganalysis:** To detect statistical anomalies that arise after data embedding.
-*   **How it works:**
-    *   A "clean" image has a smooth, continuous histogram.
-    *   **Naive LSB method** creates characteristic "steps" or paired values in the histogram because when replacing the least significant bit, pairs of values (0 and 1, 2 and 3, etc.) become almost equally probable. This is easily noticeable visually on a graph.
+- **What it is:** A graphical representation of the distribution of values (e.g., pixel colors in an image).
+- **Purpose in steganalysis:** To detect statistical anomalies that arise after data embedding.
+- **How it works:**
+  - A "clean" image has a smooth, continuous histogram.
+  - **Naive LSB method** creates characteristic "steps" or paired values in the histogram because when replacing the least significant bit, pairs of values (0 and 1, 2 and 3, etc.) become almost equally probable. This is easily noticeable visually on a graph.
 
 ### 2) **Chi-square Test (χ²)**
 
@@ -48,6 +49,7 @@ The principle is always the same: hide a data container inside another, harmless
 **In simple terms:** `k` is a parameter that indicates the "complexity" or "dimensionality" of our analysis.
 
 **In the context of steganalysis (LSB checking):**
+
 - Imagine we're analyzing an image's histogram.
 - We look at pairs of values (0 and 1, 2 and 3, 4 and 5, etc.) that might have aligned due to LSB replacement.
 - **`k` is the number of such pairs** we're checking.
@@ -60,6 +62,7 @@ The principle is always the same: hide a data container inside another, harmless
 **In simple terms:** `p-value` is the **probability that the result we observed (alignment of pairs in the histogram) occurred by chance.**
 
 **In the context of steganalysis:**
+
 - **High `p-value` (close to 1):** High probability that the histogram looks like this simply by chance. **Conclusion: Steganography is likely NOT present.**
 - **Low `p-value` (close to 0):** It's extremely unlikely that such perfect alignment of pairs happened by chance. **Conclusion: The file likely contains hidden data embedded using the LSB method.**
 
@@ -68,12 +71,13 @@ The principle is always the same: hide a data container inside another, harmless
 ---
 
 **Simply put:**
-*   **Histogram analysis** is "look at the graph and see suspicious patterns".
-*   **Chi-square test** is "calculate and get a number proving the file is suspicious".
+
+- **Histogram analysis** is "look at the graph and see suspicious patterns".
+- **Chi-square test** is "calculate and get a number proving the file is suspicious".
 
 ### 3) **Syndrome Coding**
 
-*   **Essence:** This is not a data *embedding* method, but a *matching* method. It allows embedding a message **without changing** some bits of the carrier.
+- **Essence:** This is not a data _embedding_ method, but a _matching_ method. It allows embedding a message **without changing** some bits of the carrier.
 
 <img src="https://en.lntwww.de/images/6/68/EN_KC_T_4_2_S2b_v2_neu.png" />
 
@@ -94,38 +98,43 @@ The table shows the minimal impact needed to obtain the desired "fingerprint" (s
 ### How This Works in Steganography (briefly):
 
 **STEP 1: Preparation**
+
 - We have a **cover block** (7 bits from the image): `C`
 - We have a **message** (3 bits) we want to hide: `M`
 
 **STEP 2: Compute syndrome of the cover block**
+
 - Compute the syndrome of the cover block: `S_cover = H × C` (where H is the parity-check matrix)
 - In the table, this corresponds to finding the syndrome `S_cover`
 
 **STEP 3: Compare syndromes**
+
 - **If `S_cover = M`** → Already matches! **Change nothing.** Use `e0 = (0,0,0,0,0,0,0)`
 - **If `S_cover ≠ M`** → Need to find an error vector `e` to change the syndrome
 
 **STEP 4: Find error vector**
+
 - Look in the table for a syndrome `S` equal to our target message `M`
 - Take the corresponding **coset leader** `e`
 
 **STEP 5: Embedding**
+
 - Modify the cover block: `C_stego = C + e`
 - Now the syndrome of the new block: `S_stego = H × (C + e) = H×C + H×e = S_cover + S = M`
 
-*   **Advantage:** Drastically reduces the number of carrier modifications. Ideally, only 1 bit per block is changed, making attacks based on LSB replacement statistics practically useless.
+* **Advantage:** Drastically reduces the number of carrier modifications. Ideally, only 1 bit per block is changed, making attacks based on LSB replacement statistics practically useless.
 
 ---
 
 ### **Spreading Across Multiple Bit Planes**
 
-*   **Essence:** Abandoning the naive approach where data is hidden only in the 1st least significant bit (LSB). Instead, the message is "spread" across several least significant bit planes.
-*   **How it works:**
-    1.  A pixel image can be represented as a "stack" of bit planes: from the most significant to the least significant.
-    2.  Naive LSB uses only the bottommost plane.
-    3.  Modern methods (e.g., **HOLMES**) embed data simultaneously into the 1st, 2nd, and sometimes 3rd bit planes, adapting the embedding depth to the image texture.
-    4.  In complex textures (noise, grass), even higher-order bits can be changed, as the eye won't notice. In smooth areas (sky) — only the least significant ones.
-*   **Advantage:** Drastically increases capacity and, more importantly, **resistance to steganalysis**. Statistical anomalies arising from replacing only the 1st LSB are blurred and become indistinguishable from the image's natural noise.
+- **Essence:** Abandoning the naive approach where data is hidden only in the 1st least significant bit (LSB). Instead, the message is "spread" across several least significant bit planes.
+- **How it works:**
+  1.  A pixel image can be represented as a "stack" of bit planes: from the most significant to the least significant.
+  2.  Naive LSB uses only the bottommost plane.
+  3.  Modern methods (e.g., **HOLMES**) embed data simultaneously into the 1st, 2nd, and sometimes 3rd bit planes, adapting the embedding depth to the image texture.
+  4.  In complex textures (noise, grass), even higher-order bits can be changed, as the eye won't notice. In smooth areas (sky) — only the least significant ones.
+- **Advantage:** Drastically increases capacity and, more importantly, **resistance to steganalysis**. Statistical anomalies arising from replacing only the 1st LSB are blurred and become indistinguishable from the image's natural noise.
 
 # Bit Planes
 
@@ -135,8 +144,9 @@ A **bit plane** of a digital discrete signal (such as an image or sound) is a se
 
 > **Simple example:**
 > For 16-bit data representation, there are **16 bit planes**:
-> *   The **first** bit plane contains the set of **most significant bits (MSB)**
-> *   The **sixteenth** contains the **least significant bits (LSB)**
+>
+> - The **first** bit plane contains the set of **most significant bits (MSB)**
+> - The **sixteenth** contains the **least significant bits (LSB)**
 
 <img src="https://upload.wikimedia.org/wikipedia/commons/4/48/Lichtenstein_bitplanes.png" />
 
@@ -145,8 +155,9 @@ A **bit plane** of a digital discrete signal (such as an image or sound) is a se
 ## Significance of Bit Planes
 
 It can be observed that:
-*   The **first** bit plane gives the **coarsest but most critical** approximation of the medium's values
-*   The **higher the number** of the bit plane, the **less** its contribution to the final result
+
+- The **first** bit plane gives the **coarsest but most critical** approximation of the medium's values
+- The **higher the number** of the bit plane, the **less** its contribution to the final result
 
 Thus, **adding each subsequent bit plane gives a better approximation** to the original value.
 
@@ -170,8 +181,9 @@ If a bit in the **n-th** bit plane in an **m-bit** dataset is set to 1, it contr
 ## Technical Note
 
 The term **"bit plane"** is sometimes used as a synonym for **"bitmap"**, however technically:
-*   The former refers to the **location of data in memory**
-*   The latter refers to the **data itself**
+
+- The former refers to the **location of data in memory**
+- The latter refers to the **data itself**
 
 ## Noise Analysis in Bit Planes
 
@@ -179,9 +191,10 @@ One aspect of using bit planes is determining whether a bit plane is **random no
 
 **Calculation method:**
 Compare each pixel (X, Y) with three neighboring pixels:
-*   (X − 1, Y)
-*   (X, Y − 1)
-*   (X − 1, Y − 1)
+
+- (X − 1, Y)
+- (X, Y − 1)
+- (X − 1, Y − 1)
 
 If a pixel **matches at least two** of the three neighboring pixels, it is **not considered noise**.
 
@@ -194,12 +207,14 @@ If a pixel **matches at least two** of the three neighboring pixels, it is **not
 ## 1) Media File Formats
 
 **Using PCM audio as an example:**
-*   The **first bit** in a sample denotes the **sign of the function** (determines half of the entire amplitude range)
-*   The **last bit** determines the **exact value**
+
+- The **first bit** in a sample denotes the **sign of the function** (determines half of the entire amplitude range)
+- The **last bit** determines the **exact value**
 
 **Important principle:**
-*   Changing **more significant bits** leads to **greater distortion**
-*   Changing **less significant bits** is less critical
+
+- Changing **more significant bits** leads to **greater distortion**
+- Changing **less significant bits** is less critical
 
 In lossy media compression using bit planes, this allows more freedom for encoding **less significant bit planes**, while **more significant ones must be preserved as accurately as possible**.
 
@@ -208,6 +223,7 @@ In lossy media compression using bit planes, this allows more freedom for encodi
 **Pulse-code modulation (PCM)** is used to digitize analog signals. Virtually all types of analog data **(video, audio (voice, music), telemetry)** allow the use of **PCM**.
 
 **PCM** is like "digitizing" sound or any other analog signal for use in the digital world. Without **PCM**, we couldn't store music on computers or transmit voice over the internet.
+
 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Pcm-ru.svg/1920px-Pcm-ru.svg.png" />
 
 > Example of 4-bit (16-level) PCM. Shows quantization of an analog signal and bursts of impulses encoding the samples. Transmission in the channel is performed with the most significant bits first.
@@ -219,6 +235,7 @@ Example of 4-bit (16-level) PCM. Shows quantization of an analog signal and burs
 ## PCM Operating Principle
 
 In pulse-code modulation, the analog transmitted signal is converted into digital form through three operations:
+
 - **Time sampling** (measuring the analog signal at equal time intervals (obtaining samples))
 - **Amplitude quantization** (rounding each sample to the nearest level from a finite set of values)
 - **Encoding**
@@ -228,6 +245,7 @@ In pulse-code modulation, the analog transmitted signal is converted into digita
 An analog-to-digital converter (ADC) is used to convert an analog signal to digital. The ADC measures the amplitude of the analog signal at equal intervals - obtains instantaneous values or signal samples, then converts the samples into binary words.
 
 The measured instantaneous value (sample) of the analog signal is quantized by levels (rounded to the nearest integer). The number of quantization levels is usually equal to or a multiple of an integer power of 2, for example:
+
 - 2³ = 8 levels
 - 2⁴ = 16 levels
 - 2⁵ = 32 levels
@@ -238,7 +256,7 @@ The level number is encoded with binary words of length 3, 4, 5, etc. bits.
 
 Then the ADC's output words in parallel code are encoded by feeding them to a shift register clocked by an auxiliary shift generator. At the output of the shift register, bursts of encoded impulses in serial code are formed. Then the impulse bursts are transmitted into the communication channel.
 
-*Note: An impulse burst is periodically repeating impulses over a fixed time interval.*
+_Note: An impulse burst is periodically repeating impulses over a fixed time interval._
 
 ### Sampling Frequency
 
@@ -285,9 +303,10 @@ Linear pulse-code modulation.
 ## 2) Raster Displays
 
 Some computers displayed graphics in bit plane format, specifically:
-*   **PCs with EGA video cards**
-*   **Amiga**
-*   **Atari ST**
+
+- **PCs with EGA video cards**
+- **Amiga**
+- **Atari ST**
 
 This contrasted with the more common packed format. This organization allowed performing certain classes of image operations using **bitwise operations** (especially with the **blitter** chip), as well as creating **parallax scrolling** effects.
 
@@ -303,28 +322,32 @@ This can sometimes provide a **good enough approximation** for correlation opera
 ## 4) Neural Networks
 
 Bit plane formats can be used to feed images into:
-*   **Spiking neural networks**
-*   **Neural networks/convolutional neural networks with low-precision** approximations
+
+- **Spiking neural networks**
+- **Neural networks/convolutional neural networks with low-precision** approximations
 
 ## 5) Software
 
 Many image processing packages can **split an image into bit planes**. Open-source tools include:
 
-*   **`Pamarith`** from the **Netpbm** package
-*   **`Convert`** from **ImageMagick**
+- **`Pamarith`** from the **Netpbm** package
+- **`Convert`** from **ImageMagick**
 
 ---
 
 **2. In Audio and Video**
-*   **Same principle:** Making changes imperceptible to human hearing/vision in the audio track (masking in critical hearing bands, modifying phase spectrum) or in video frames. For example, adding quiet echo signals with specific delays that encode information.
+
+- **Same principle:** Making changes imperceptible to human hearing/vision in the audio track (masking in critical hearing bands, modifying phase spectrum) or in video frames. For example, adding quiet echo signals with specific delays that encode information.
 
 **3. In Text**
-*   **Methods:** Changing the number of spaces or tabs (difficult to detect visually but trivially revealed by analyzing source code), using invisible Unicode characters (Zero-Width Joiner, Zero-Width Non-Joiner), algorithmic synonymization.
-*   **Most primitive historical example:** Pricking specific letters in text with a pin that form a secret message.
+
+- **Methods:** Changing the number of spaces or tabs (difficult to detect visually but trivially revealed by analyzing source code), using invisible Unicode characters (Zero-Width Joiner, Zero-Width Non-Joiner), algorithmic synonymization.
+- **Most primitive historical example:** Pricking specific letters in text with a pin that form a secret message.
 
 **4. In Network Traffic (Network Steganography)**
-*   **Methods:** Hiding data in service fields of network packet headers (e.g., in IP ID, TTL field, or flags), in the time delay between packets (timing channels), or in "empty" TCP segments.
-*   **This is especially dangerous** because detecting such traffic with standard protection tools (firewalls, IDS) is almost impossible, especially inside an encrypted channel (HTTPS), which hides the stego-carrier itself from deep packet inspection.
+
+- **Methods:** Hiding data in service fields of network packet headers (e.g., in IP ID, TTL field, or flags), in the time delay between packets (timing channels), or in "empty" TCP segments.
+- **This is especially dangerous** because detecting such traffic with standard protection tools (firewalls, IDS) is almost impossible, especially inside an encrypted channel (HTTPS), which hides the stego-carrier itself from deep packet inspection.
 
 ### Steganography vs Cryptography
 
@@ -340,22 +363,27 @@ Many image processing packages can **split an image into bit planes**. Open-sour
 ### Real Threats and Applications
 
 **1. Cyber Espionage and APT Attacks**
-*   **How it's used:** Malware steals data and exfiltrates it, disguising it as normal traffic. Common scheme: data is hidden in an image uploaded to a public resource (forum, GitHub, cloud), and the malware on the compromised machine downloads it. Encrypted HTTPS connection hides the stego-carrier from inspection.
+
+- **How it's used:** Malware steals data and exfiltrates it, disguising it as normal traffic. Common scheme: data is hidden in an image uploaded to a public resource (forum, GitHub, cloud), and the malware on the compromised machine downloads it. Encrypted HTTPS connection hides the stego-carrier from inspection.
 
 **2. Circumventing Censorship in Totalitarian Regimes**
-*   **How it's used:** Activists and journalists use steganography to transmit information through blocked channels without attracting the attention of censors who look for keywords in plain text.
+
+- **How it's used:** Activists and journalists use steganography to transmit information through blocked channels without attracting the attention of censors who look for keywords in plain text.
 
 **3. Concealing Criminal Activity**
-*   **How it's used:** Criminal communities exchange instructions and data by hiding them in files posted on public forums and cloud storage. **Important clarification:** using social media is problematic as they often recompress images, destroying the stego-container.
+
+- **How it's used:** Criminal communities exchange instructions and data by hiding them in files posted on public forums and cloud storage. **Important clarification:** using social media is problematic as they often recompress images, destroying the stego-container.
 
 **4. Digital Watermarks (the other side)**
-*   **This is a legal application:** Copyright holders embed invisible marks into their content to confirm authorship and track leaks. This is steganography where the goal is not to hide the fact of transmission, but to hide the mark itself until the moment of verification.
+
+- **This is a legal application:** Copyright holders embed invisible marks into their content to confirm authorship and track leaks. This is steganography where the goal is not to hide the fact of transmission, but to hide the mark itself until the moment of verification.
 
 ### Detection (Steganalysis)
 
 Steganalysis is the art of detecting steganography.
-*   **Methods:** Statistical analysis of the carrier file for anomalies (histogram analysis, Chi-square tests), entropy analysis, searching for traces of specific steganography tools, machine learning to identify patterns.
-*   **Hard truth:** A universal detector does not exist. Detection is **difficult and often impossible without a hypothesis about the method used.** However, against specific, known methods (like naive LSB), steganalysis can be highly effective. Channel capacity is low, but it's sufficient for transmitting keys, passwords, or control commands.
+
+- **Methods:** Statistical analysis of the carrier file for anomalies (histogram analysis, Chi-square tests), entropy analysis, searching for traces of specific steganography tools, machine learning to identify patterns.
+- **Hard truth:** A universal detector does not exist. Detection is **difficult and often impossible without a hypothesis about the method used.** However, against specific, known methods (like naive LSB), steganalysis can be highly effective. Channel capacity is low, but it's sufficient for transmitting keys, passwords, or control commands.
 
 ### Final Verdict
 

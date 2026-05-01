@@ -305,6 +305,7 @@ Each JVM thread has a **private stack**, created when it starts. The stack consi
     }
     ```
 2.  **`@sun.misc.Contended` (Java 8+)**: Annotation instructing JVM to **automatically add padding** around a field or the entire class.
+
     ```java
     import jdk.internal.vm.annotation.Contended;
     public class StripedCounter {
