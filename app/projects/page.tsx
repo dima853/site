@@ -1,8 +1,9 @@
 import projectsData from '@/data/projectsData'
 import Card from '@/components/Card'
 import { genPageMetadata } from 'app/seo'
+import { Metadata } from 'next'
 
-export const metadata = genPageMetadata({ title: 'Projects' })
+export const metadata: Metadata = genPageMetadata({ title: 'Projects' })
 
 export default function Projects() {
   return (
